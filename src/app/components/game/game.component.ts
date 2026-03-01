@@ -1,26 +1,42 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PokerService } from '../../services/poker.service';
 import { Player, GameState, Card, HandReplay } from '../../models/poker.model';
 import { Observable } from 'rxjs';
+import { ActivatedRoute } from '@angular/router';
 
 @Component({
   selector: 'app-game',
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div *ngIf="game$ | async as state" class="game-container" [class.animating-chips]="isAnimatingChips">
+    <div *ngIf="game$ | async as state" class="game-container" 
+         [class.animating-chips]="isAnimatingChips"
+         [class.is-spectator]="role === 'spectator'">
       <div class="top-bar">
-        <div class="blind-info glass-card">
-          Blinds: <span class="text-gradient">{{ state.smallBlind }} / {{ state.bigBlind }}</span>
-          <button (click)="openBlindsModal(state.smallBlind, state.bigBlind)" class="edit-blinds-btn" title="Augmenter les Blinds">✎</button>
+        <div class="left-badges">
+          <div class="blind-info glass-card badge-item">
+            Blinds: <span class="text-gradient">{{ state.smallBlind }} / {{ state.bigBlind }}</span>
+            <button *ngIf="role === 'dealer'" (click)="openBlindsModal(state.smallBlind, state.bigBlind)" class="edit-blinds-btn" title="Augmenter les Blinds">✎</button>
+          </div>
+          <div class="room-info glass-card badge-item" *ngIf="roomId">
+            Salle: <span class="text-accent">{{ roomId }}</span>
+          </div>
         </div>
-        <div class="display-toggle glass-card">
-          <label>Affichage:</label>
-          <div class="toggle-btns">
-            <button [class.active]="viewMode === 'chips'" (click)="viewMode = 'chips'">Chips</button>
-            <button [class.active]="viewMode === 'bb'" (click)="viewMode = 'bb'">BB</button>
+        
+        <div class="right-badges">
+          <!-- Game timer for spectators -->
+          <div class="time-info glass-card badge-item" *ngIf="role === 'spectator' && (game$ | async)?.startTime">
+            <span class="label">Temps de Jeu:</span>
+            <span class="value text-accent">{{ gameTimeDisplay }}</span>
+          </div>
+          <div class="display-toggle glass-card">
+            <label>Affichage:</label>
+            <div class="toggle-btns">
+              <button [class.active]="viewMode === 'chips'" (click)="viewMode = 'chips'">Chips</button>
+              <button [class.active]="viewMode === 'bb'" (click)="viewMode = 'bb'">BB</button>
+            </div>
           </div>
         </div>
       </div>
@@ -33,7 +49,7 @@ import { Observable } from 'rxjs';
               <span class="pot-value" [innerHTML]="formatValue(state.pot, state.bigBlind)"></span>
             </div>
             
-            <div *ngIf="state.isHandOver" class="hand-over-overlay">
+            <div *ngIf="state.isHandOver && role === 'dealer'" class="hand-over-overlay">
               <h2 class="text-gradient">Main Terminée</h2>
               <div class="hand-over-btns">
                 <button (click)="startNextHand()" 
@@ -73,10 +89,6 @@ import { Observable } from 'rxjs';
                [class.is-winner]="isWinner(p.id)">
 
             <div class="player-info glass-card">
-              <div class="player-cards" *ngIf="!p.isFolded && !p.isEliminated">
-                <div class="mini-card glass-card">🂠</div>
-                <div class="mini-card glass-card">🂠</div>
-              </div>
               <span class="player-name">{{ p.name }}</span>
               <span class="player-chips" [class.danger-text]="p.chips === 0 && !p.isEliminated" [innerHTML]="formatValue(p.chips, state.bigBlind)">
               </span>
@@ -98,7 +110,7 @@ import { Observable } from 'rxjs';
         </div>
       </div>
 
-      <div class="controls-area glass-card" *ngIf="!state.isHandOver">
+      <div class="controls-area glass-card" *ngIf="!state.isHandOver && role === 'dealer'">
         <div class="player-label">
           <ng-container *ngIf="state.currentPhase !== 'showdown'; else showdownLabel">
             Tour de : <span class="text-gradient">{{ getCurrentPlayer(state)?.name }}</span>
@@ -155,18 +167,18 @@ import { Observable } from 'rxjs';
             <button (click)="resolveShowdown()" class="btn-success" [disabled]="selectedWinners.length === 0">Confirmer les gagnants</button>
           </div>
           <button (click)="advancePhaseWithAnimation()" 
-                  class="btn-next" 
+                  class="btn-next hide-mobile" 
                   [class.flashing]="state.waitingForPhaseAdvancement"
                   [disabled]="!state.waitingForPhaseAdvancement"
                   *ngIf="state.currentPhase !== 'showdown'">
             {{ state.waitingForPhaseAdvancement ? 'DISTRIBUER' : 'Distribuer les cartes' }}
           </button>
-          <button (click)="openAddPlayerModal(state.players.length)" class="btn-secondary">Ajouter un joueur</button>
+          <button (click)="openAddPlayerModal(state.players.length)" class="btn-secondary hide-mobile">Ajouter un joueur</button>
         </div>
       </div>
 
       <!-- Simple Add Player Modal -->
-      <div class="modal-overlay" *ngIf="showAddPlayerModal">
+      <div class="modal-overlay" *ngIf="showAddPlayerModal && role === 'dealer'">
         <div class="glass-card modal">
           <h3>Ajouter un joueur</h3>
           <div class="input-field">
@@ -194,22 +206,24 @@ import { Observable } from 'rxjs';
       </div>
 
       <!-- Elimination / Rebuy Modal -->
-      <div class="modal-overlay" *ngIf="state.isHandOver && getBankruptPlayer(state) as p">
-        <div class="glass-card modal rebuy-modal">
-          <h2 class="text-gradient">{{ p.name }} est kickout !</h2>
-          <p>Voulez-vous recaver ou kickout ce joueur ?</p>
-          <div class="modal-buttons vertical">
-            <div class="rebuy-input-group">
-              <input type="number" [(ngModel)]="rebuyAmount" placeholder="Montant">
-              <button (click)="confirmRebuy(p.id)" class="btn-success">Recaver</button>
+      <ng-container *ngIf="role === 'dealer'">
+        <div class="modal-overlay" *ngIf="state.isHandOver && getBankruptPlayer(state) as p">
+          <div class="glass-card modal rebuy-modal">
+            <h2 class="text-gradient">{{ p.name }} est kickout !</h2>
+            <p>Voulez-vous recaver ou kickout ce joueur ?</p>
+            <div class="modal-buttons vertical">
+              <div class="rebuy-input-group">
+                <input type="number" [(ngModel)]="rebuyAmount" placeholder="Montant">
+                <button (click)="confirmRebuy(p.id)" class="btn-success">Recaver</button>
+              </div>
+              <button (click)="confirmElimination(p.id)" class="btn-fold">Kickout le joueur</button>
             </div>
-            <button (click)="confirmElimination(p.id)" class="btn-fold">Kickout le joueur</button>
           </div>
         </div>
-      </div>
+      </ng-container>
 
       <!-- Blinds Update Modal -->
-      <div class="modal-overlay" *ngIf="showBlindsModal">
+      <div class="modal-overlay" *ngIf="showBlindsModal && role === 'dealer'">
         <div class="glass-card modal">
           <h3>Augmenter les Blinds</h3>
           <div class="rebuy-input-group" style="flex-direction: column; gap: 15px;">
@@ -229,7 +243,7 @@ import { Observable } from 'rxjs';
         </div>
       </div>
       <!-- Replay Saver Modal -->
-      <div class="modal-overlay" *ngIf="isSavingReplay">
+      <div class="modal-overlay" *ngIf="isSavingReplay && role === 'dealer'">
         <div class="glass-card modal card-saver-modal">
           <h2 class="text-gradient">Enregistrer le coup</h2>
           
@@ -313,32 +327,119 @@ import { Observable } from 'rxjs';
   `,
   styles: [`
     .game-container {
-      padding: 20px 40px;
+      padding: 10px 20px;
       display: flex;
       flex-direction: column;
-      gap: 20px;
-      height: calc(100vh - 100px);
+      gap: 10px;
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
     }
     .top-bar {
       display: flex;
       justify-content: space-between;
-      gap: 20px;
+      gap: 5px;
+      z-index: 100;
     }
-    .blind-info, .display-toggle {
-      padding: 10px 20px;
-      border-radius: 15px;
+    .left-badges, .right-badges {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .right-badges {
+      align-items: flex-end;
+    }
+    .blind-info, .display-toggle, .room-info, .time-info {
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      border-radius: 12px;
       display: flex;
       align-items: center;
-      gap: 12px;
-      font-weight: 600;
+      gap: 8px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .time-info {
+      background: rgba(15, 23, 42, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 0.9rem;
+      padding: 8px 14px;
+    }
+    .time-info .label { color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .time-info .value { font-family: 'Courier New', Courier, monospace; font-size: 1.1rem; }
+    .blind-info {
+      font-size: 1.1rem;
+      padding: 10px 18px;
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      background: rgba(15, 23, 42, 0.8);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+    .hide-desktop { display: none; }
+    
+    @media (max-width: 768px) {
+      .hide-mobile { display: none !important; }
+      .hide-desktop { display: flex !important; }
+
+      .top-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        width: 100%;
+        gap: 10px;
+      }
+      .display-toggle label { display: none; }
+      .display-toggle { 
+        background: transparent !important; 
+        border: none !important; 
+        box-shadow: none !important;
+        padding: 0 !important;
+        margin-top: 10px; /* Space between rows */
+        z-index: 200;
+      }
+      .left-badges, .right-badges {
+        flex-direction: row;
+        gap: 3px;
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+      }
+      .right-badges {
+        margin-top: 5px;
+        align-items: center;
+      }
+      .badge-item, .time-info {
+        flex: 1;
+        font-size: 0.5rem !important;
+        padding: 4px 2px !important;
+        border-radius: 5px !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 0;
+        text-align: center;
+      }
+      .time-info .value { font-size: 0.65rem; }
+      .time-info .label { display: none; }
+      .header-btn {
+        font-weight: 800;
+        border: 1px solid var(--card-border);
+      }
+      .blind-info, .room-info {
+        border-width: 0.5px;
+      }
+      .edit-blinds-btn {
+        padding: 1px 4px;
+        font-size: 0.55rem;
+        border-radius: 3px;
+        margin-left: 2px;
+      }
     }
     .edit-blinds-btn {
       background: rgba(255,255,255,0.1);
       border: 1px solid var(--card-border);
-      padding: 4px 10px;
+      padding: 5px 12px;
       border-radius: 8px;
-      font-size: 0.9rem;
-      margin-left: 8px;
+      font-size: 1rem;
+      margin-left: 12px;
     }
     .edit-blinds-btn:hover { background: var(--accent-primary); color: #000; border-color: transparent; }
 
@@ -365,17 +466,53 @@ import { Observable } from 'rxjs';
       display: flex;
       justify-content: center;
       align-items: center;
+      position: relative;
+      margin-bottom: 80px; /* Space for fixed controls */
+    }
+    .is-spectator:not(.hide-mobile) .table-area {
+      margin-bottom: 20px;
+    }
+    @media (min-width: 769px) {
+      .is-spectator .poker-table {
+        max-width: 1300px;
+        max-height: 650px;
+        border-radius: 325px;
+      }
+      .is-spectator .pot-display {
+        transform: scale(1.2);
+        top: 22%;
+      }
+      .is-spectator .community-cards {
+        transform: translate(-50%, -50%) scale(1.3);
+      }
     }
     .poker-table {
-      width: 1000px;
-      height: 500px;
+      width: 100%;
+      height: 100%;
+      max-width: 1000px;
+      max-height: 500px;
       border-radius: 250px;
       position: relative;
       background: radial-gradient(ellipse at center, #1e3a8a, #0f172a);
-      border: 10px solid var(--card-border);
+      border: 8px solid var(--card-border);
       display: flex;
       justify-content: center;
       align-items: center;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    }
+
+    @media (max-width: 768px) {
+      .poker-table {
+        border-radius: 80px;
+        max-height: none;
+        height: 55vh; /* Reduced height */
+        width: 70vw;  /* Reduced width */
+        border-width: 3px;
+      }
+      .table-area {
+         margin-bottom: 170px; /* Further increased to push table up */
+         margin-top: -20px;    /* Pull table up further */
+      }
     }
     .pot-area {
       text-align: center;
@@ -387,8 +524,14 @@ import { Observable } from 'rxjs';
     }
     .pot-display { 
       position: absolute;
-      top: 28%;
+      top: 25%;
       display: flex; flex-direction: column; gap: 0;
+      transform: scale(0.8);
+    }
+    
+    @media (max-width: 768px) {
+      .pot-display { top: 18%; transform: scale(0.6); }
+      .community-cards { transform: translate(-50%, -50%) scale(0.6); }
     }
     .pot-label { font-size: 0.7rem; font-weight: 900; opacity: 0.8; letter-spacing: 0.1em; }
     .pot-value { font-size: 1.8rem; font-weight: 800; transition: var(--transition); }
@@ -406,8 +549,8 @@ import { Observable } from 'rxjs';
     }
     .cards-track { display: flex; gap: 6px; }
     .poker-card {
-      width: 36px;
-      height: 52px;
+      width: 30px;
+      height: 44px;
       animation: cardPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) backwards;
     }
     .card-inner {
@@ -435,7 +578,59 @@ import { Observable } from 'rxjs';
       animation: pulse 2s infinite;
     }
 
-    .player-seat { position: absolute; width: 140px; text-align: center; transition: var(--transition); }
+    .player-seat { 
+      position: absolute; 
+      width: 140px; 
+      text-align: center; 
+      transition: var(--transition); 
+      z-index: 10;
+    }
+    
+    @media (max-width: 768px) {
+      .player-seat {
+        width: 75px;
+      }
+      .player-info {
+        padding: 4px !important;
+        border-radius: 8px !important;
+        min-width: 70px;
+      }
+      .player-name {
+        font-size: 0.6rem !important;
+        font-weight: 700 !important;
+      }
+      .player-chips {
+        font-size: 0.6rem !important;
+      }
+      .mini-card {
+        width: 16px !important;
+        height: 22px !important;
+        font-size: 0.6rem !important;
+        top: -22px !important;
+      }
+      .badges {
+        top: -4px;
+        left: -4px;
+        scale: 0.6;
+      }
+      .current-bet {
+        bottom: -22px !important;
+        padding: 2px 8px !important;
+        font-size: 0.6rem !important;
+        border-radius: 10px !important;
+        white-space: nowrap;
+      }
+      .current-bet .poker-chip {
+        width: 8px !important;
+        height: 8px !important;
+        margin-right: 3px !important;
+        border-width: 1px !important;
+      }
+      .current-bet .poker-chip::after {
+        width: 2px !important;
+        height: 2px !important;
+      }
+    }
     .player-info { padding: 16px; border-radius: 20px; display: flex; flex-direction: column; gap: 4px; position: relative; }
     .active-turn .player-info {
       background: rgba(56, 189, 248, 0.15);
@@ -457,7 +652,7 @@ import { Observable } from 'rxjs';
     .danger-text { color: var(--danger); animation: pulse 1s infinite; }
     @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
     
-    .badges { position: absolute; top: -12px; right: -12px; display: flex; gap: 4px; }
+    .badges { position: absolute; top: -8px; left: -8px; display: flex; gap: 4px; z-index: 20; }
     .badge {
       width: 28px; height: 28px; border-radius: 50%;
       font-size: 0.7rem; font-weight: 900;
@@ -500,9 +695,9 @@ import { Observable } from 'rxjs';
     }
 
     .action-bubble {
-      position: absolute; top: -85px; left: 50%; transform: translateX(-50%);
-      padding: 4px 12px; border-radius: 8px;
-      font-size: 0.75rem; font-weight: 900;
+      position: absolute; top: -35px; left: 50%; transform: translateX(-50%);
+      padding: 4px 10px; border-radius: 6px;
+      font-size: 0.7rem; font-weight: 900;
       background: rgba(255,255,255,0.2);
       backdrop-filter: blur(4px);
       border: 1px solid rgba(255,255,255,0.1);
@@ -526,8 +721,20 @@ import { Observable } from 'rxjs';
       100% { opacity: 1; transform: translateY(0) scale(1); }
     }
 
-    .controls-area { padding: 30px; display: flex; justify-content: space-between; align-items: center; gap: 20px; }
-    .action-buttons { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .controls-area { 
+      padding: 15px; 
+      display: flex; 
+      flex-direction: column; 
+      gap: 15px;
+      margin-top: auto;
+    }
+    .action-buttons { 
+      display: flex; 
+      gap: 10px; 
+      flex-wrap: wrap; 
+      align-items: center;
+      justify-content: center;
+    }
     
     .raise-container {
       display: flex;
@@ -626,7 +833,114 @@ import { Observable } from 'rxjs';
     }
     .btn-raise-action:active:not(:disabled) { transform: translateY(0); }
     
-    .round-management { display: flex; flex-direction: column; gap: 12px; align-items: flex-end; }
+    .controls-area { 
+      padding: 10px; 
+      display: flex; 
+      flex-direction: column; 
+      gap: 10px;
+      background: var(--bg-color) !important;
+      border-top: 1px solid var(--card-border);
+    }
+    .action-buttons { 
+      display: flex; 
+      gap: 5px; 
+      flex-wrap: nowrap; 
+      align-items: center;
+      justify-content: space-between;
+      overflow-x: auto;
+      padding-bottom: 5px;
+    }
+    .action-buttons button {
+      flex: 1;
+      padding: 8px 5px;
+      font-size: 0.75rem;
+      min-width: 60px;
+    }
+
+    @media (max-width: 768px) {
+      .controls-area {
+        position: fixed;
+        bottom: 15px;
+        left: 15px;
+        right: 15px;
+        z-index: 1000;
+        padding: 12px;
+        background: rgba(15, 23, 42, 0.95) !important;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        border-radius: 20px;
+        border: 1px solid rgba(255,255,255,0.1);
+      }
+      .player-label {
+        display: none;
+      }
+      .action-buttons {
+         margin-bottom: 0;
+         padding-bottom: 0px; /* Reduced padding */
+         display: flex;
+         flex-wrap: wrap;
+         gap: 2px; /* Reduced gap */
+         justify-content: space-between;
+      }
+      .action-buttons button {
+         flex: 1;
+         padding: 4px 2px; /* Reduced padding */
+         font-size: 0.65rem;
+         border-radius: 6px;
+      }
+      .raise-container {
+        width: 100%;
+        max-width: none;
+        flex-direction: column;
+        gap: 2px; /* Reduced gap */
+        padding: 2px; /* Reduced padding */
+        background: rgba(0,0,0,0.6);
+        border-radius: 6px;
+        margin: 0;
+        display: flex;
+      }
+      .stepper-group {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 2px 0; /* Reduced padding */
+      }
+      .btn-step {
+        width: 26px; /* Smaller stepper buttons */
+        height: 26px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255,255,255,0.1);
+        border-radius: 50%;
+        font-size: 1.1rem;
+        border: 1px solid rgba(255,255,255,0.2);
+        flex: 0 0 auto !important;
+      }
+      .raise-mount-display input {
+        font-size: 1rem;
+        width: 50px;
+        text-align: center;
+      }
+      .btn-raise-action {
+        width: 100%;
+        padding: 6px !important; /* Reduced padding */
+        font-size: 0.7rem !important;
+        background: var(--accent-primary) !important;
+        color: #000 !important;
+        font-weight: 800;
+        border-radius: 6px;
+      }
+      .round-management {
+        gap: 3px;
+      }
+      .round-management button {
+        font-size: 0.7rem;
+        padding: 6px 10px;
+      }
+    }
     .winner-selection {
       display: flex; flex-direction: column; gap: 12px;
       background: rgba(255,255,255,0.05); padding: 20px; border-radius: 20px;
@@ -673,19 +987,25 @@ import { Observable } from 'rxjs';
       position: fixed; inset: 0; background: rgba(0,0,0,0.8);
       backdrop-filter: blur(8px); display: flex; justify-content: center; align-items: center; z-index: 1000;
     }
-    .modal { width: 450px; padding: 40px; display: flex; flex-direction: column; gap: 20px; }
+    .modal { 
+      width: 90%; 
+      max-width: 450px; 
+      padding: 25px; 
+      display: flex; 
+      flex-direction: column; 
+      gap: 15px; 
+    }
     .rebuy-modal { border-color: var(--warning); text-align: center; }
     .vertical { flex-direction: column; }
     .rebuy-input-group { display: flex; gap: 10px; }
     .rebuy-input-group input { flex: 1; }
-    .card-saver-modal { width: 600px; max-height: 90vh; overflow-y: auto; }
+    .card-saver-modal { width: 800px; max-width: 95vw; max-height: 90vh; overflow-y: auto; }
     .saver-section, .saver-players { margin: 15px 0; }
     .cards-setup-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px; }
     .card-slot { cursor: pointer; }
     .p-setup-name { font-weight: 700; font-size: 0.9rem; color: var(--text-secondary); }
     .p-setup-name.is-winner { color: var(--success); }
     .player-card-setup { padding: 10px; background: rgba(0,0,0,0.2); border-radius: 12px; margin-bottom: 8px; }
-    .picker-modal { width: 650px; }
     .suit-grid { margin-bottom: 10px; }
     .sub-modal { z-index: 1100; }
     .card-placeholder.mini { width: 32px; height: 48px; }
@@ -699,6 +1019,27 @@ import { Observable } from 'rxjs';
     .status-badge.rebought { background: var(--warning); color: #000; }
     .folded-placeholder { padding: 8px; font-style: italic; color: var(--text-secondary); font-size: 0.8rem; }
     .status-badge-mini.folded { background: #475569; color: white; opacity: 0.7; }
+
+    @media (max-width: 768px) {
+      .card-saver-modal {
+        width: 95% !important;
+        padding: 15px !important;
+      }
+      .cards-setup-row {
+        gap: 5px;
+      }
+      .poker-card-real {
+        width: 35px;
+        height: 50px;
+        padding: 4px;
+      }
+      .poker-card-real .rank {
+        font-size: 0.8rem;
+      }
+      .poker-card-real .suit-icon {
+        font-size: 1rem;
+      }
+    }
   `]
 })
 export class GameComponent implements OnInit {
@@ -741,9 +1082,12 @@ export class GameComponent implements OnInit {
   currentPickTarget: { type: 'board' | 'player', index: number, playerId?: string } | null = null;
   totalHandPot = 0;
   playersWhoReboughtInThisHand: string[] = [];
-
   ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
   suits: ('H' | 'D' | 'C' | 'S')[] = ['H', 'D', 'C', 'S'];
+  roomId: string | null = null;
+  role: 'dealer' | 'spectator' = 'dealer';
+  gameTimeDisplay = '00:00:00';
+  private timerInterval: any;
 
   startSavingReplay(state: GameState) {
     this.isSavingReplay = true;
@@ -832,14 +1176,48 @@ export class GameComponent implements OnInit {
     this.raiseAmount = Math.max(min, this.raiseAmount + delta);
   }
 
-  constructor(private pokerService: PokerService) {
+  constructor(private pokerService: PokerService, private route: ActivatedRoute) {
     this.game$ = this.pokerService.game$;
   }
 
   currentWinnerId: string | undefined;
 
+  ngOnDestroy() {
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+    }
+  }
+
+  startTimer(startTime: number) {
+    if (this.timerInterval) clearInterval(this.timerInterval);
+
+    this.timerInterval = setInterval(() => {
+      const diff = Date.now() - startTime;
+      const hours = Math.floor(diff / 3600000);
+      const minutes = Math.floor((diff % 3600000) / 60000);
+      const seconds = Math.floor((diff % 60000) / 1000);
+
+      this.gameTimeDisplay = [
+        hours.toString().padStart(2, '0'),
+        minutes.toString().padStart(2, '0'),
+        seconds.toString().padStart(2, '0')
+      ].join(':');
+    }, 1000);
+  }
+
   ngOnInit() {
+    this.route.queryParams.subscribe(params => {
+      if (params['room']) {
+        this.roomId = params['room'];
+        this.pokerService.enableSync(this.roomId!);
+      }
+    });
+
     this.game$.subscribe(state => {
+      this.role = this.pokerService.currentRole;
+      if (state.startTime && !this.timerInterval) {
+        this.startTimer(state.startTime);
+      }
       this.raiseAmount = state.minRaise;
       if (state.currentPhase === 'pre-flop' && state.pot > 0 && !state.isHandOver && state.history.length === 0) {
         // Hand just started
@@ -874,9 +1252,20 @@ export class GameComponent implements OnInit {
   }
 
   getSeatTransform(index: number, total: number) {
+    const isMobile = window.innerWidth < 768;
+    const isSpectator = this.role === 'spectator';
     const angle = (index / total) * 2 * Math.PI - (Math.PI / 2);
-    const radiusX = 450;
-    const radiusY = 220;
+
+    // Higher radiusX, tighter radiusY to avoid bottom/top clipping on mobile
+    let radiusX = isMobile ? (window.innerWidth * 0.42) : 450;
+    let radiusY = isMobile ? (window.innerHeight * 0.28) : 220;
+
+    // Increase radii for spectators on desktop
+    if (!isMobile && isSpectator) {
+      radiusX = 580;
+      radiusY = 280;
+    }
+
     const x = Math.cos(angle) * radiusX;
     const y = Math.sin(angle) * radiusY;
     return `translate(${x}px, ${y}px)`;

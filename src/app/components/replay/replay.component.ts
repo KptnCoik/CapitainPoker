@@ -114,9 +114,10 @@ import { GameState, HandReplay, Card } from '../../models/poker.model';
 
     .replays-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-      gap: 24px;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 20px;
     }
+    
     .replay-card {
       padding: 20px;
       display: flex;
@@ -188,6 +189,31 @@ import { GameState, HandReplay, Card } from '../../models/poker.model';
       padding: 60px;
       text-align: center;
       color: var(--text-secondary);
+    }
+    
+    @media (max-width: 768px) {
+      .replay-container {
+        padding: 20px 10px;
+      }
+      .header-actions {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+      }
+      .replays-grid {
+        grid-template-columns: 1fr;
+      }
+      .replay-card {
+        padding: 15px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .replay-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+      }
     }
     
     .card-placeholder.mini { width: 32px; height: 48px; border-radius: 4px; }

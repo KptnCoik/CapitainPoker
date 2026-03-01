@@ -60,8 +60,22 @@ import { Router } from '@angular/router';
           </select>
         </div>
 
+        <div class="multiplayer-box">
+          <label>Options Multi-joueurs</label>
+          <div class="multi-actions">
+            <div class="join-group">
+              <input type="text" [(ngModel)]="joinRoomId" placeholder="ID de la salle">
+              <button (click)="joinRoom()" [disabled]="!joinRoomId" class="join-btn">Rejoindre</button>
+            </div>
+            <p class="or-separator">OU</p>
+            <button (click)="startMultiplayer()" class="host-btn" [disabled]="!isSetupValid()">
+               Créer une salle partagée
+            </button>
+          </div>
+        </div>
+
         <button (click)="startGame()" class="start-btn" [disabled]="!isSetupValid()">
-          Commencer la partie
+          Commencer Localement
         </button>
       </div>
     </div>
@@ -205,6 +219,74 @@ import { Router } from '@angular/router';
       opacity: 0.5;
       cursor: not-allowed;
     }
+
+    .multiplayer-box {
+      border-top: 1px solid var(--card-border);
+      padding-top: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .multi-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .join-group {
+      display: flex;
+      gap: 8px;
+    }
+    .join-group input { flex: 1; text-transform: uppercase; }
+    .join-btn { background: var(--glass); white-space: nowrap; }
+    .or-separator {
+      text-align: center;
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      font-weight: 800;
+      margin: 4px 0;
+    }
+    .host-btn {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid var(--accent-primary);
+      color: var(--accent-primary);
+    }
+    .host-btn:hover:not(:disabled) {
+      background: var(--accent-primary);
+      color: #000;
+    }
+
+    /* RESPONSIVE SETUP */
+    @media (max-width: 768px) {
+      .setup-container {
+        padding: 10px;
+        align-items: flex-start;
+      }
+      .setup-card {
+        padding: 24px;
+        border-radius: 16px;
+        gap: 20px;
+      }
+      h1 { font-size: 1.8rem; }
+      .player-input-row {
+        padding: 4px;
+      }
+      .blind-inputs input, .input-with-hint input {
+        padding: 10px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .setup-card {
+        padding: 20px 15px;
+        gap: 16px;
+      }
+      .subtitle {
+        font-size: 0.9rem;
+      }
+      .player-input-row input {
+        font-size: 0.9rem;
+      }
+    }
   `]
 })
 export class SetupComponent {
@@ -214,6 +296,7 @@ export class SetupComponent {
   bigBlind: number = 10;
   dealerIndex: number = 0;
   draggingIndex: number | null = null;
+  joinRoomId: string = '';
 
   constructor(private pokerService: PokerService, private router: Router) { }
 
@@ -266,6 +349,7 @@ export class SetupComponent {
   }
 
   startGame() {
+    this.pokerService.disableSync();
     this.pokerService.setupGame(
       this.playerNames,
       this.initialChips,
@@ -274,5 +358,35 @@ export class SetupComponent {
       Number(this.dealerIndex)
     );
     this.router.navigate(['/game']);
+  }
+
+  async startMultiplayer() {
+    if (!this.isSetupValid()) return;
+
+    // Generate a random room ID
+    const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+    // Setup game state
+    this.pokerService.setupGame(
+      this.playerNames,
+      this.initialChips,
+      this.smallBlind,
+      this.bigBlind,
+      Number(this.dealerIndex)
+    );
+
+    // Enable sync with this ID
+    await this.pokerService.enableSync(roomId);
+
+    this.router.navigate(['/game'], { queryParams: { room: roomId } });
+  }
+
+  async joinRoom() {
+    if (!this.joinRoomId) return;
+
+    const roomId = this.joinRoomId.toUpperCase().trim();
+    await this.pokerService.enableSync(roomId);
+
+    this.router.navigate(['/game'], { queryParams: { room: roomId } });
   }
 }

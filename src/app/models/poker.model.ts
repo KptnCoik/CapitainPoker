@@ -75,6 +75,7 @@ export interface GameState {
     savedHands: HandReplay[];
     isHandOver: boolean;
     waitingForPhaseAdvancement: boolean;
+    startTime?: number; // timestamp in ms
 }
 
 export interface ActionRecord {

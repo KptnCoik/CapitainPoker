@@ -1,7 +1,8 @@
-import { Injectable, PLATFORM_ID, Inject } from '@angular/core';
+import { Injectable, PLATFORM_ID, Inject, inject } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { BehaviorSubject } from 'rxjs';
 import { GameState, Player, PokerPhase, ActionRecord, PlayerStats, Card, HandReplay } from '../models/poker.model';
+import { Firestore, doc, onSnapshot, setDoc, Timestamp, collection, getDocs } from '@angular/fire/firestore';
 
 @Injectable({
     providedIn: 'root'
@@ -26,13 +27,77 @@ export class PokerService {
     private gameSubject = new BehaviorSubject<GameState>(this.initialState);
     public game$ = this.gameSubject.asObservable();
 
+    private firestore = inject(Firestore);
+    private activeGameId: string | null = null;
+    private userRole: 'dealer' | 'spectator' = 'dealer';
+    private firestoreUnsubscribe: (() => void) | null = null;
+
+    private updateState(newState: GameState) {
+        this.gameSubject.next(newState);
+        if (this.activeGameId && isPlatformBrowser(this.platformId)) {
+            const gameRef = doc(this.firestore, `games/${this.activeGameId}`);
+            setDoc(gameRef, this.serializeState(newState)).catch(err => {
+                console.error('Failed to sync to Firebase:', err);
+            });
+        }
+    }
+
+    public async enableSync(gameId: string) {
+        if (this.firestoreUnsubscribe) {
+            this.firestoreUnsubscribe();
+        }
+        this.activeGameId = gameId;
+        const gameRef = doc(this.firestore, `games/${gameId}`);
+
+        this.firestoreUnsubscribe = onSnapshot(gameRef, (snapshot) => {
+            if (snapshot.exists()) {
+                const data = snapshot.data();
+                const remoteState = this.deserializeState(data as any);
+                // Only update if state is different to avoid infinite loops
+                // (simple comparison of JSON should work for this use case)
+                if (JSON.stringify(remoteState) !== JSON.stringify(this.gameSubject.value)) {
+                    this.gameSubject.next(remoteState);
+                }
+            }
+        });
+    }
+
+    public disableSync() {
+        if (this.firestoreUnsubscribe) {
+            this.firestoreUnsubscribe();
+            this.firestoreUnsubscribe = null;
+        }
+        this.activeGameId = null;
+        this.userRole = 'dealer'; // Reset to default
+    }
+
+    public setRole(role: 'dealer' | 'spectator') {
+        this.userRole = role;
+    }
+
+    public get currentRole(): 'dealer' | 'spectator' {
+        return this.userRole;
+    }
+
+    private serializeState(state: GameState): any {
+        // Deep clone and handle non-serializable objects (Dates in history & savedHands)
+        return JSON.parse(JSON.stringify(state));
+    }
+
+    private deserializeState(data: any): GameState {
+        // Here we could handle converting ISO strings back to Dates if needed,
+        // but the app seems to work fine if we use them for display (or if we treat them as strings).
+        // Let's ensure basic structure.
+        return data as GameState;
+    }
+
     public saveHandReplay(hand: HandReplay) {
         const state = this.currentState;
         const newSavedHands = [hand, ...state.savedHands];
         if (isPlatformBrowser(this.platformId)) {
             localStorage.setItem('poker_saved_hands', JSON.stringify(newSavedHands));
         }
-        this.gameSubject.next({ ...state, savedHands: newSavedHands });
+        this.updateState({ ...state, savedHands: newSavedHands });
     }
 
     constructor(@Inject(PLATFORM_ID) private platformId: Object) {
@@ -43,7 +108,7 @@ export class PokerService {
                     const savedHands = JSON.parse(saved);
                     // Update the simple BehaviorSubject with loaded data
                     // Note: We merging with initialState to ensure other required fields are present
-                    this.gameSubject.next({ ...this.initialState, savedHands });
+                    this.updateState({ ...this.initialState, savedHands });
                 } catch (e) {
                     console.error('Failed to load saved hands', e);
                 }
@@ -78,7 +143,7 @@ export class PokerService {
             stats: this.createEmptyStats()
         }));
 
-        this.gameSubject.next({
+        this.updateState({
             ...this.initialState,
             players,
             dealerIndex,
@@ -86,7 +151,8 @@ export class PokerService {
             bigBlind,
             minRaise: bigBlind,
             isHandOver: false,
-            currentPhase: 'pre-flop'
+            currentPhase: 'pre-flop',
+            startTime: Date.now()
         });
 
         this.moveDealer();
@@ -132,7 +198,7 @@ export class PokerService {
         // Update positions for all players
         players = players.map((p, i) => ({ ...p, position: i }));
 
-        this.gameSubject.next({
+        this.updateState({
             ...state,
             players,
             dealerIndex: newDealerIndex,
@@ -157,7 +223,7 @@ export class PokerService {
             }
             return p;
         });
-        this.gameSubject.next({ ...state, players });
+        this.updateState({ ...state, players });
     }
 
     public eliminatePlayer(playerId: string, eliminatedBy?: string) {
@@ -180,7 +246,7 @@ export class PokerService {
             }
             return p;
         });
-        this.gameSubject.next({ ...state, players });
+        this.updateState({ ...state, players });
     }
 
     public recordAction(playerId: string, actionType: 'fold' | 'check' | 'call' | 'raise' | 'all-in', amount: number = 0) {
@@ -270,7 +336,7 @@ export class PokerService {
             newLastAggressor = playerIndex;
         }
 
-        this.gameSubject.next({
+        this.updateState({
             ...state,
             players: updatedPlayers,
             pot: state.pot + actualAmount,
@@ -300,7 +366,7 @@ export class PokerService {
             if (state.currentPhase === 'river') {
                 this.advancePhase();
             } else {
-                this.gameSubject.next({ ...state, waitingForPhaseAdvancement: true });
+                this.updateState({ ...state, waitingForPhaseAdvancement: true });
             }
             return;
         }
@@ -329,10 +395,10 @@ export class PokerService {
             if (state.currentPhase === 'river') {
                 this.advancePhase();
             } else {
-                this.gameSubject.next({ ...state, waitingForPhaseAdvancement: true });
+                this.updateState({ ...state, waitingForPhaseAdvancement: true });
             }
         } else {
-            this.gameSubject.next({ ...state, currentPlayerIndex: nextIndex });
+            this.updateState({ ...state, currentPlayerIndex: nextIndex });
         }
     }
 
@@ -430,7 +496,7 @@ export class PokerService {
 
         const totalPot = updatedPlayers.reduce((sum, p) => sum + p.currentBet, 0);
 
-        this.gameSubject.next({
+        this.updateState({
             ...state,
             players: updatedPlayers,
             dealerIndex: finalDealerIndex,
@@ -495,7 +561,7 @@ export class PokerService {
                 lastAction: p.isFolded ? 'FOLD' : (p.isEliminated ? 'OUT' : undefined)
             }));
 
-            this.gameSubject.next({
+            this.updateState({
                 ...state,
                 currentPhase: newPhase,
                 currentPlayerIndex: firstPlayer,
@@ -526,7 +592,7 @@ export class PokerService {
             // we just give they all pot if we want, but logically they win what they covered.
             // If they covered 0, they win 0 from others.
             // Let's just avoid infinite loop.
-            this.gameSubject.next({ ...state, isHandOver: true });
+            this.updateState({ ...state, isHandOver: true });
             return;
         }
 
@@ -567,7 +633,7 @@ export class PokerService {
         // Otherwise, keep isHandOver false to let UI select next winner for side pot.
         const canContinue = remainingPot > 0 && finalPlayers.some(p => p.handContribution > 0 && !p.isFolded && !p.isEliminated);
 
-        this.gameSubject.next({
+        this.updateState({
             ...state,
             players: finalPlayers,
             pot: remainingPot,
@@ -577,7 +643,7 @@ export class PokerService {
 
     public setBlinds(smallBlind: number, bigBlind: number) {
         const state = this.currentState;
-        this.gameSubject.next({
+        this.updateState({
             ...state,
             smallBlind,
             bigBlind,
@@ -585,7 +651,16 @@ export class PokerService {
         });
     }
 
+    public async getActiveGames(): Promise<{ id: string, state: GameState }[]> {
+        const gamesCol = collection(this.firestore, 'games');
+        const snapshot = await getDocs(gamesCol);
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            state: this.deserializeState(doc.data() as any)
+        }));
+    }
+
     public resetGame() {
-        this.gameSubject.next(this.initialState);
+        this.updateState(this.initialState);
     }
 }

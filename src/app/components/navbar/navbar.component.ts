@@ -11,6 +11,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
       <div class="logo text-gradient">CAPITAINE - POKER</div>
       <div class="nav-links">
         <a routerLink="/setup" routerLinkActive="active">Réglages</a>
+        <a routerLink="/join" routerLinkActive="active">Rejoindre</a>
         <a routerLink="/game" routerLinkActive="active">Table</a>
         <a routerLink="/info" routerLinkActive="active">Stats</a>
         <a routerLink="/replay" routerLinkActive="active">History</a>
@@ -59,6 +60,25 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
       height: 2px;
       background: var(--accent-primary);
       box-shadow: 0 0 8px var(--accent-primary);
+    }
+    
+    @media (max-width: 768px) {
+      .navbar {
+        margin: 10px;
+        padding: 12px 20px;
+        flex-direction: column;
+        gap: 12px;
+        text-align: center;
+      }
+      .logo {
+        font-size: 1.1rem;
+      }
+      .nav-links {
+        gap: 15px;
+      }
+      a {
+        font-size: 0.85rem;
+      }
     }
   `]
 })

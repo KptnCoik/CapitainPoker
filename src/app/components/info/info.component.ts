@@ -17,7 +17,7 @@ import { Router } from '@angular/router';
           <h1 class="text-gradient">Informations</h1>
           <div class="display-toggle glass-card">
             <div class="toggle-btns">
-              <button [class.active]="displayMode === 'cards'" (click)="displayMode = 'cards'">🎴 Cartes</button>
+              <button [class.active]="displayMode === 'cards'" (click)="displayMode = 'cards'">🎴 Stats</button>
               <button [class.active]="displayMode === 'ranking'" (click)="displayMode = 'ranking'">🏆 Classement</button>
             </div>
             <div class="divider"></div>
@@ -27,7 +27,6 @@ import { Router } from '@angular/router';
             </div>
           </div>
         </div>
-        <button (click)="resetGame()" class="btn-reset">Nouvelle partie 🔄</button>
       </div>
 
       <div class="stats-grid" *ngIf="displayMode === 'cards'">
@@ -40,7 +39,7 @@ import { Router } from '@angular/router';
           <div class="stats-details">
             <div class="compact-row">
               <span class="label">Recave ({{ p.rebuyCount }})</span>
-              <button (click)="rebuy(p.id)" class="rebuy-btn">+ Recave</button>
+              <button *ngIf="role === 'dealer'" (click)="rebuy(p.id)" class="rebuy-btn">+ Recave</button>
             </div>
             
             <div class="stat-row">
@@ -90,7 +89,10 @@ import { Router } from '@angular/router';
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let p of getSortedPlayers(state.players); let i = index" [class.eliminated-row]="p.isEliminated">
+            <tr *ngFor="let p of getSortedPlayers(state.players); let i = index" 
+                [class.eliminated-row]="p.isEliminated"
+                [attr.data-ko]="p.stats.eliminations"
+                [attr.data-won]="p.stats.handsWon">
               <td class="rank-cell">
                  <span *ngIf="!p.isEliminated" class="rank-num">{{ i + 1 }}</span>
                  <span *ngIf="p.isEliminated" class="rank-out">OUT</span>
@@ -167,13 +169,7 @@ import { Router } from '@angular/router';
       color: #000;
     }
 
-    .btn-reset {
-      background: var(--danger);
-      color: white;
-      padding: 12px 24px;
-      font-size: 1rem;
-      box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
-    }
+
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -216,7 +212,7 @@ import { Router } from '@angular/router';
     .text-accent { color: var(--accent-primary); }
 
     /* Ranking Styles */
-    .ranking-container { padding: 0; overflow: hidden; }
+    .ranking-container { padding: 0; overflow: hidden; margin-top: 20px; }
     .ranking-table { width: 100%; border-collapse: collapse; }
     .ranking-table th { 
       background: rgba(255,255,255,0.05); 
@@ -257,6 +253,102 @@ import { Router } from '@angular/router';
       border-radius: 6px;
       font-weight: 800;
     }
+
+    /* Responsive Adjustments */
+    @media (max-width: 992px) {
+      .ranking-table .ko-col, .ranking-table .won-col, .ranking-table .rebuy-col {
+        display: none;
+      }
+      .ranking-table th:nth-child(4), .ranking-table td:nth-child(4),
+      .ranking-table th:nth-child(5), .ranking-table td:nth-child(5),
+      .ranking-table th:nth-child(6), .ranking-table td:nth-child(6) {
+        display: none;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .info-container {
+        padding: 15px;
+      }
+      .header-actions {
+        flex-direction: column;
+        align-items: stretch;
+        margin-bottom: 20px;
+        gap: 15px;
+      }
+      .title-group {
+        flex-direction: column;
+        gap: 15px;
+        align-items: flex-start;
+      }
+      .display-toggle {
+        width: 100%;
+        justify-content: space-between;
+        padding: 8px;
+      }
+      .toggle-btns button {
+        padding: 6px 10px;
+        font-size: 0.75rem;
+      }
+      .btn-reset {
+        width: 100%;
+        padding: 10px;
+        font-size: 0.9rem;
+      }
+      
+      /* On very small devices, we turn the table into a card-like view per row */
+      .ranking-table thead {
+        display: none; /* Hide header on mobile */
+      }
+      .ranking-table, .ranking-table tbody, .ranking-table tr, .ranking-table td {
+        display: block;
+        width: 100%;
+      }
+      .ranking-table tr {
+        margin-bottom: 12px;
+        padding: 12px;
+        background: rgba(255,255,255,0.03);
+        border-radius: 12px;
+        position: relative;
+        border: 1px solid rgba(255,255,255,0.05);
+      }
+      .ranking-table td {
+        border: none;
+        padding: 4px 0;
+      }
+      .rank-cell {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        width: auto !important;
+      }
+      .name-cell {
+        font-size: 1.1rem;
+        padding-bottom: 8px !important;
+        border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+        margin-bottom: 8px;
+        width: calc(100% - 40px);
+      }
+      .chips-cell {
+        text-align: left !important;
+        font-size: 1rem;
+        font-weight: 800;
+        color: var(--accent-primary);
+      }
+      
+      /* Re-show mini-stats on mobile cards */
+      .ranking-table tr::after {
+        content: 'Stats: KO ' attr(data-ko) ' / Gagnées ' attr(data-won);
+        display: block;
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        margin-top: 8px;
+      }
+      
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+    }
   `]
 })
 export class InfoComponent {
@@ -266,6 +358,10 @@ export class InfoComponent {
 
   constructor(private pokerService: PokerService, private router: Router) {
     this.game$ = this.pokerService.game$;
+  }
+
+  get role(): 'dealer' | 'spectator' {
+    return this.pokerService.currentRole;
   }
 
   formatValue(value: number, bigBlind: number): string {
@@ -298,10 +394,5 @@ export class InfoComponent {
     }
   }
 
-  resetGame() {
-    if (confirm('Êtes-vous sûr de vouloir recommencer un tout nouveau tournoi ? Cela effacera tous les joueurs et les statistiques.')) {
-      this.pokerService.resetGame();
-      this.router.navigate(['/setup']);
-    }
-  }
+
 }
