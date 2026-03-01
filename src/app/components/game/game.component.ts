@@ -23,6 +23,16 @@ import { ActivatedRoute } from '@angular/router';
           <div class="room-info glass-card badge-item" *ngIf="roomId">
             Salle: <span class="text-accent">{{ roomId }}</span>
           </div>
+          <!-- Mobile only buttons at top -->
+          <button *ngIf="role === 'dealer' && state.currentPhase !== 'showdown'" (click)="advancePhaseWithAnimation()" 
+                  class="header-btn btn-next badge-item hide-desktop" 
+                  [class.flashing]="state.waitingForPhaseAdvancement"
+                  [disabled]="!state.waitingForPhaseAdvancement">
+            DIST.
+          </button>
+          <button *ngIf="role === 'dealer'" (click)="openAddPlayerModal(state.players.length)" class="header-btn btn-secondary badge-item hide-desktop">
+            +JOUEUR
+          </button>
         </div>
         
         <div class="right-badges">
@@ -637,6 +647,13 @@ import { ActivatedRoute } from '@angular/router';
       border-color: var(--accent-primary);
       box-shadow: 0 0 25px rgba(56, 189, 248, 0.5);
       transform: scale(1.1);
+      animation: turnPulse 1.5s infinite ease-in-out;
+      z-index: 100;
+    }
+    @keyframes turnPulse {
+      0% { transform: scale(1.05); box-shadow: 0 0 10px rgba(56, 189, 248, 0.4); border-color: rgba(56, 189, 248, 0.4); }
+      50% { transform: scale(1.15); box-shadow: 0 0 30px rgba(56, 189, 248, 0.8); border-color: var(--accent-primary); }
+      100% { transform: scale(1.05); box-shadow: 0 0 10px rgba(56, 189, 248, 0.4); border-color: rgba(56, 189, 248, 0.4); }
     }
     .is-winner .player-info {
       border-color: var(--success);

@@ -42,12 +42,23 @@ export class PokerService {
         }
     }
 
-    public async enableSync(gameId: string) {
+    public async enableSync(gameId: string, forcePushInitialState = false) {
         if (this.firestoreUnsubscribe) {
             this.firestoreUnsubscribe();
         }
+
+        // Clear local state ONLY if we are joining an existing room (not hosting/creating)
+        // to avoid seeing data from a previous session while waiting for the snapshot.
+        if (!forcePushInitialState && this.activeGameId !== gameId) {
+            this.gameSubject.next({ ...this.initialState });
+        }
+
         this.activeGameId = gameId;
         const gameRef = doc(this.firestore, `games/${gameId}`);
+
+        if (forcePushInitialState) {
+            await setDoc(gameRef, this.serializeState(this.gameSubject.value));
+        }
 
         this.firestoreUnsubscribe = onSnapshot(gameRef, (snapshot) => {
             if (snapshot.exists()) {
@@ -121,6 +132,7 @@ export class PokerService {
     }
 
     public setupGame(playerNames: string[], initialChips: number, smallBlind: number, bigBlind: number, dealerIndex: number) {
+        this.disableSync(); // Ensure no previous game ID is active before setting up
         const players: Player[] = playerNames.map((name, index) => ({
             id: Math.random().toString(36).substring(2, 9),
             name,

@@ -288,6 +288,6 @@ export class JoinGameComponent implements OnInit {
     if (!this.selectedGameId) return;
     this.pokerService.setRole(role);
     this.pokerService.enableSync(this.selectedGameId);
-    this.router.navigate(['/game']);
+    this.router.navigate(['/game'], { queryParams: { room: this.selectedGameId } });
   }
 }

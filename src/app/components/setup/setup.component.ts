@@ -375,8 +375,8 @@ export class SetupComponent {
       Number(this.dealerIndex)
     );
 
-    // Enable sync with this ID
-    await this.pokerService.enableSync(roomId);
+    // Enable sync with this ID and push initial state
+    await this.pokerService.enableSync(roomId, true);
 
     this.router.navigate(['/game'], { queryParams: { room: roomId } });
   }
