@@ -134,7 +134,7 @@ import { ActivatedRoute } from '@angular/router';
           <button (click)="fold()" class="btn-fold" [disabled]="state.currentPhase === 'showdown' || state.waitingForPhaseAdvancement">Fold</button>
           <button (click)="check()" class="btn-check" [disabled]="state.currentPhase === 'showdown' || state.waitingForPhaseAdvancement">Check / Call</button>
           <div class="raise-container" [class.disabled]="state.currentPhase === 'showdown' || state.waitingForPhaseAdvancement">
-            <div class="stepper-group">
+            <div class="stepper-group hide-mobile">
               <button (click)="adjustRaise(-state.bigBlind, state.minRaise)" 
                       class="btn-step" 
                       [disabled]="state.currentPhase === 'showdown' || state.waitingForPhaseAdvancement">−</button>
@@ -149,6 +149,16 @@ import { ActivatedRoute } from '@angular/router';
               <button (click)="adjustRaise(state.bigBlind, state.minRaise)" 
                       class="btn-step" 
                       [disabled]="state.currentPhase === 'showdown' || state.waitingForPhaseAdvancement">+</button>
+            </div>
+
+            <div class="slider-group hide-desktop">
+              <div class="slider-value" [innerHTML]="formatValue(raiseAmount, state.bigBlind)"></div>
+              <input type="range" 
+                     [(ngModel)]="raiseAmount" 
+                     [min]="state.minRaise" 
+                     [max]="(getCurrentPlayer(state)?.chips || state.minRaise)" 
+                     [step]="state.bigBlind"
+                     [disabled]="state.currentPhase === 'showdown' || state.waitingForPhaseAdvancement">
             </div>
             <button (click)="raise()" 
                     class="btn-raise-action" 
@@ -515,13 +525,13 @@ import { ActivatedRoute } from '@angular/router';
       .poker-table {
         border-radius: 80px;
         max-height: none;
-        height: 55vh; /* Reduced height */
-        width: 70vw;  /* Reduced width */
+        height: 52vh; /* Re-applied: Slightly reduced to make room */
+        width: 70vw;  
         border-width: 3px;
       }
       .table-area {
-         margin-bottom: 170px; /* Further increased to push table up */
-         margin-top: -20px;    /* Pull table up further */
+         margin-bottom: 180px; /* Pull board down slightly */
+         margin-top: -35px;    /* Pull table up slightly */
       }
     }
     .pot-area {
@@ -877,16 +887,16 @@ import { ActivatedRoute } from '@angular/router';
     @media (max-width: 768px) {
       .controls-area {
         position: fixed;
-        bottom: 15px;
-        left: 15px;
-        right: 15px;
+        bottom: 8px; /* Re-applied: Lowered to edge */
+        left: 8px;   
+        right: 8px;
         z-index: 1000;
-        padding: 12px;
-        background: rgba(15, 23, 42, 0.95) !important;
-        backdrop-filter: blur(10px);
-        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        border-radius: 20px;
-        border: 1px solid rgba(255,255,255,0.1);
+        padding: 8px; /* Compacted */
+        background: rgba(10, 15, 25, 0.98) !important;
+        backdrop-filter: blur(15px);
+        box-shadow: 0 5px 20px rgba(0,0,0,0.6);
+        border-radius: 16px;
+        border: 1px solid rgba(255,255,255,0.08);
       }
       .player-label {
         display: none;
@@ -940,6 +950,52 @@ import { ActivatedRoute } from '@angular/router';
         font-size: 1rem;
         width: 50px;
         text-align: center;
+      }
+      .slider-group {
+        width: 100%;
+        display: flex;
+        flex-direction: row; /* Re-applied: Horizontal layout */
+        align-items: center;
+        gap: 15px;
+        padding: 6px 12px;
+        background: rgba(0,0,0,0.4);
+        border-radius: 10px;
+        margin-bottom: 4px;
+      }
+      .slider-value {
+        font-size: 0.85rem; 
+        min-width: 60px;
+        font-weight: 800;
+        color: var(--accent-primary);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .slider-group input[type=range] {
+        -webkit-appearance: none;
+        flex: 1; /* Take remaining space */
+        background: transparent;
+      }
+      .slider-group input[type=range]:focus {
+        outline: none;
+      }
+      .slider-group input[type=range]::-webkit-slider-runnable-track {
+        width: 100%;
+        height: 6px;
+        cursor: pointer;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 3px;
+      }
+      .slider-group input[type=range]::-webkit-slider-thumb {
+        height: 20px;
+        width: 20px;
+        border-radius: 50%;
+        background: var(--accent-primary);
+        cursor: pointer;
+        -webkit-appearance: none;
+        margin-top: -7px;
+        box-shadow: 0 0 10px var(--accent-primary);
+        border: 2px solid white;
       }
       .btn-raise-action {
         width: 100%;

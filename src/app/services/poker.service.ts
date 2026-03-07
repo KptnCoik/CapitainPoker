@@ -221,7 +221,7 @@ export class PokerService {
 
     public rebuy(playerId: string, amount: number) {
         const state = this.currentState;
-        const players = state.players.map(p => {
+        const updatedPlayers = state.players.map(p => {
             if (p.id === playerId) {
                 return {
                     ...p,
@@ -235,19 +235,38 @@ export class PokerService {
             }
             return p;
         });
-        this.updateState({ ...state, players });
+        this.updateState({ ...state, players: updatedPlayers });
     }
 
     public eliminatePlayer(playerId: string, eliminatedBy?: string) {
         const state = this.currentState;
-        const players = state.players.map(p => {
+        const player = state.players.find(p => p.id === playerId);
+        if (!player) return;
+
+        // Tournament Rank Logic:
+        // Already out (previous hands) = initialChipsForHand is 0 (reset in moveDealer)
+        const alreadyOutPreviousHands = state.players.filter(p => !!p.finishPosition && p.initialChipsForHand === 0).length;
+
+        // Same hand bankrupts with FEWER chips than me
+        // They have chips === 0 AND initialChipsForHand > 0 (still have their count from start of hand)
+        const bankruptsFewerThanMe = state.players.filter(p =>
+            p.id !== playerId &&
+            p.chips === 0 &&
+            p.initialChipsForHand > 0 &&
+            p.initialChipsForHand < player.initialChipsForHand
+        ).length;
+
+        const finishPosition = state.players.length - alreadyOutPreviousHands - bankruptsFewerThanMe;
+
+        const updatedPlayers = state.players.map(p => {
             if (p.id === playerId) {
                 return {
                     ...p,
                     isEliminated: true,
                     isActive: false,
                     isFolded: true,
-                    lastAction: 'OUT'
+                    lastAction: 'OUT',
+                    finishPosition
                 };
             }
             if (eliminatedBy && p.id === eliminatedBy) {
@@ -258,7 +277,7 @@ export class PokerService {
             }
             return p;
         });
-        this.updateState({ ...state, players });
+        this.updateState({ ...state, players: updatedPlayers });
     }
 
     public recordAction(playerId: string, actionType: 'fold' | 'check' | 'call' | 'raise' | 'all-in', amount: number = 0) {

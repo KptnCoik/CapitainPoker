@@ -18,6 +18,7 @@ export interface Player {
     needsToPostDeadBlind: boolean;
     lastAction?: string;
     stats: PlayerStats;
+    finishPosition?: number;
 }
 
 export interface PlayerStats {
