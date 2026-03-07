@@ -1,0 +1,68 @@
+<div *ngIf="game$ | async as state" class="replay-container">
+    <div class="header-actions">
+        <h1 class="text-gradient">Historique des mains</h1>
+        <div class="header-right">
+            <div class="view-toggle">
+                <button [class.active]="viewMode === 'chips'" (click)="viewMode = 'chips'">JETONS</button>
+                <button [class.active]="viewMode === 'bb'" (click)="viewMode = 'bb'">BB</button>
+            </div>
+            <div class="stats-badge glass-card">
+                {{ state.savedHands.length }} mains enregistrées
+            </div>
+        </div>
+    </div>
+
+    <div class="replays-grid">
+        <div *ngFor="let hand of state.savedHands" class="glass-card replay-card">
+            <div class="replay-header">
+                <span class="timestamp">{{ hand.timestamp | date:'shortTime' }}</span>
+                <span class="pot-badge text-gradient">POT:
+                    <span *ngIf="viewMode === 'chips'">{{ hand.pot }}</span>
+                    <span *ngIf="viewMode === 'bb'">{{ (hand.pot / getBigBlind(hand)) | number:'1.1-1' }} BB</span>
+                </span>
+            </div>
+
+            <div class="community-row">
+                <div *ngFor="let card of hand.communityCards" class="poker-card-real mini"
+                    [ngClass]="'suit-' + card.suit">
+                    <span class="rank">{{ card.rank }}</span>
+                    <span class="suit-icon">{{ getSuitChar(card.suit) }}</span>
+                </div>
+                <div *ngFor="let i of [].constructor(5 - hand.communityCards.length)" class="card-placeholder mini">
+                </div>
+            </div>
+
+            <div class="players-recap">
+                <div *ngFor="let p of hand.players" class="player-replay-row" [class.winner]="p.isWinner">
+                    <div class="p-info">
+                        <div class="name-row">
+                            <span class="p-name">{{ p.name }}</span>
+                            <div class="name-badges">
+                                <span class="all-in-badge-mini" *ngIf="p.isAllIn">TAPIS</span>
+                                <span class="status-badge-mini eliminated" *ngIf="p.isEliminated">KICKOUT</span>
+                                <span class="status-badge-mini rebought" *ngIf="p.isRebought">RECAVE</span>
+                            </div>
+                        </div>
+                        <span class="p-win" [class.negative]="p.winAmount < 0" *ngIf="p.winAmount !== 0">
+                            <span *ngIf="viewMode === 'chips'">{{ p.winAmount > 0 ? '+' : '' }}{{ p.winAmount }}</span>
+                            <span *ngIf="viewMode === 'bb'">{{ p.winAmount > 0 ? '+' : '' }}{{ (p.winAmount /
+                                getBigBlind(hand)) | number:'1.1-1' }} BB</span>
+                        </span>
+                    </div>
+                    <div class="p-cards">
+                        <div *ngFor="let card of p.holeCards" class="poker-card-real mini"
+                            [ngClass]="'suit-' + card.suit">
+                            <span class="rank">{{ card.rank }}</span>
+                            <span class="suit-icon">{{ getSuitChar(card.suit) }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div *ngIf="state.savedHands.length === 0" class="no-data glass-card">
+        <h3>Aucune main enregistrée</h3>
+        <p>Enregistrez vos plus gros coups à la fin d'une main pour les retrouver ici !</p>
+    </div>
+</div>

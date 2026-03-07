@@ -1,0 +1,107 @@
+<div *ngIf="game$ | async as state" class="info-container">
+    <div class="header-actions">
+        <div class="title-group">
+            <h1 class="text-gradient">Informations</h1>
+            <div class="display-toggle glass-card">
+                <div class="toggle-btns">
+                    <button [class.active]="displayMode === 'cards'" (click)="displayMode = 'cards'">🎴 Stats</button>
+                    <button [class.active]="displayMode === 'ranking'" (click)="displayMode = 'ranking'">🏆
+                        Classement</button>
+                </div>
+                <div class="divider"></div>
+                <div class="toggle-btns">
+                    <button [class.active]="unitMode === 'chips'" (click)="unitMode = 'chips'">Chips</button>
+                    <button [class.active]="unitMode === 'bb'" (click)="unitMode = 'bb'">BB</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="stats-grid" *ngIf="displayMode === 'cards'">
+        <div *ngFor="let p of state.players" class="glass-card stat-card" [class.eliminated]="p.isEliminated">
+            <div class="card-header">
+                <h3>{{ p.name }}</h3>
+                <span class="chip-total text-gradient" [innerHTML]="formatValue(p.chips, state.bigBlind)"></span>
+            </div>
+
+            <div class="stats-details">
+                <div class="compact-row">
+                    <span class="label">Recave ({{ p.rebuyCount }})</span>
+                    <button *ngIf="role === 'dealer'" (click)="rebuy(p.id)" class="rebuy-btn">+ Recave</button>
+                </div>
+
+                <div class="stat-row">
+                    <span class="label">P-F/Flop Folds</span>
+                    <span class="value">{{ p.stats.preFlopFolds }} / {{ p.stats.flopFolds }}</span>
+                </div>
+
+                <div class="stat-row">
+                    <span class="label">Turn/Riv Folds</span>
+                    <span class="value">{{ p.stats.turnFolds }} / {{ p.stats.riverFolds }}</span>
+                </div>
+
+                <div class="stat-row">
+                    <span class="label">Raises/All-ins</span>
+                    <span class="value">{{ p.stats.raises }} / {{ p.stats.allIns }}</span>
+                </div>
+
+                <div class="stat-row">
+                    <span class="label">Played / Won</span>
+                    <span class="value">{{ calculatePercentage(p.stats.voluntarilyPlayed, p.stats.totalHands) }}% / {{
+                        p.stats.handsWon }}</span>
+                </div>
+
+                <div class="stat-row">
+                    <span class="label">KO (Elim.)</span>
+                    <span class="value text-accent">{{ p.stats.eliminations }}</span>
+                </div>
+
+                <div class="stat-row highlight">
+                    <span class="label">H-Received</span>
+                    <span class="value">{{ p.stats.totalHands }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ranking View -->
+    <div class="ranking-container glass-card" *ngIf="displayMode === 'ranking'">
+        <table class="ranking-table">
+            <thead>
+                <tr>
+                    <th class="rank-col">#</th>
+                    <th>JOUEUR</th>
+                    <th class="text-right chips-col">JETONS</th>
+                    <th class="text-center ko-col">K.O (Éliminés)</th>
+                    <th class="text-center won-col">MAINS GAGNÉES</th>
+                    <th class="text-center rebuy-col">RECAVES</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr *ngFor="let p of getSortedPlayers(state.players); let i = index"
+                    [class.eliminated-row]="p.isEliminated" [attr.data-ko]="p.stats.eliminations"
+                    [attr.data-won]="p.stats.handsWon">
+                    <td class="rank-cell">
+                        <span class="rank-num" [class.is-out]="p.isEliminated">
+                            {{ p.finishPosition || (i + 1) }}
+                        </span>
+                    </td>
+                    <td class="name-cell">
+                        <div class="player-name-group">
+                            <strong>{{ p.name }}</strong>
+                        </div>
+                    </td>
+                    <td class="chips-cell text-right">
+                        <span [class.text-gradient]="!p.isEliminated"
+                            [innerHTML]="formatValue(p.chips, state.bigBlind)"></span>
+                    </td>
+                    <td class="text-center">
+                        <span class="ko-badge">{{ p.stats.eliminations }}</span>
+                    </td>
+                    <td class="text-center">{{ p.stats.handsWon }}</td>
+                    <td class="text-center">{{ p.rebuyCount }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>

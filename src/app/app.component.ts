@@ -7,17 +7,8 @@ import { NavbarComponent } from './components/navbar/navbar.component';
   selector: 'app-root',
   standalone: true,
   imports: [CommonModule, RouterOutlet, NavbarComponent],
-  template: `
-    <app-navbar></app-navbar>
-    <main>
-      <router-outlet></router-outlet>
-    </main>
-  `,
-  styles: [`
-    main {
-      min-height: calc(100vh - 100px);
-    }
-  `]
+  templateUrl: './app.component.html',
+  styleUrl: './app.component.css'
 })
 export class AppComponent {
   title = 'poker';

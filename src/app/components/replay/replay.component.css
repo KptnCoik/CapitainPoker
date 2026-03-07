@@ -1,0 +1,218 @@
+.replay-container {
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+}
+
+.header-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.stats-badge {
+    padding: 10px 20px;
+    font-weight: 700;
+    color: var(--accent-primary);
+}
+
+.view-toggle {
+    display: flex;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 4px;
+    border-radius: 10px;
+    border: 1px solid var(--card-border);
+}
+
+.view-toggle button {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.view-toggle button.active {
+    background: var(--accent-primary);
+    color: #000;
+}
+
+.replays-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+}
+
+.replay-card {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    transition: var(--transition);
+}
+
+.replay-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--accent-primary);
+}
+
+.replay-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--card-border);
+    padding-bottom: 10px;
+}
+
+.timestamp {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.pot-badge {
+    font-weight: 900;
+    font-size: 1.2rem;
+}
+
+.community-row {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    padding: 10px 0;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+}
+
+.players-recap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.player-replay-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+}
+
+.player-replay-row.winner {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.p-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.p-name {
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.name-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.p-win {
+    font-size: 0.8rem;
+    color: var(--success);
+    font-weight: 900;
+}
+
+.p-win.negative {
+    color: var(--danger);
+}
+
+.p-cards {
+    display: flex;
+    gap: 4px;
+}
+
+.all-in-badge-mini {
+    font-size: 0.6rem;
+    background: var(--accent-secondary);
+    color: white;
+    padding: 1px 4px;
+    border-radius: 4px;
+    font-weight: 900;
+}
+
+.name-badges {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+}
+
+.status-badge-mini {
+    font-size: 0.55rem;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-weight: 900;
+    color: white;
+}
+
+.status-badge-mini.eliminated {
+    background: var(--danger);
+}
+
+.status-badge-mini.rebought {
+    background: var(--warning);
+    color: #000;
+}
+
+.no-data {
+    padding: 60px;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+    .replay-container {
+        padding: 20px 10px;
+    }
+
+    .header-actions {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+
+    .replays-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .replay-card {
+        padding: 15px;
+    }
+}
+
+@media (max-width: 480px) {
+    .replay-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+}
+
+.card-placeholder.mini {
+    width: 32px;
+    height: 48px;
+    border-radius: 4px;
+}

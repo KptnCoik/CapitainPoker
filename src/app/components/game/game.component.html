@@ -1,0 +1,329 @@
+<div *ngIf="game$ | async as state" class="game-container" [class.animating-chips]="isAnimatingChips"
+    [class.is-spectator]="role === 'spectator'">
+    <div class="top-bar">
+        <div class="left-badges">
+            <div class="blind-info glass-card badge-item">
+                Blinds: <span class="text-gradient">{{ state.smallBlind }} / {{ state.bigBlind }}</span>
+                <button *ngIf="role === 'dealer'" (click)="openBlindsModal(state.smallBlind, state.bigBlind)"
+                    class="edit-blinds-btn" title="Augmenter les Blinds">✎</button>
+            </div>
+            <div class="room-info glass-card badge-item" *ngIf="roomId">
+                Salle: <span class="text-accent">{{ roomId }}</span>
+            </div>
+            <!-- Mobile only buttons at top -->
+            <button *ngIf="role === 'dealer' && state.currentPhase !== 'showdown'" (click)="advancePhaseWithAnimation()"
+                class="header-btn btn-next badge-item hide-desktop" [class.flashing]="state.waitingForPhaseAdvancement"
+                [disabled]="!state.waitingForPhaseAdvancement">
+                DIST.
+            </button>
+            <button *ngIf="role === 'dealer'" (click)="openAddPlayerModal(state.players.length)"
+                class="header-btn btn-secondary badge-item hide-desktop">
+                +JOUEUR
+            </button>
+        </div>
+
+        <div class="right-badges">
+            <!-- Game timer for spectators -->
+            <div class="time-info glass-card badge-item" *ngIf="role === 'spectator' && (game$ | async)?.startTime">
+                <span class="label">Temps de Jeu:</span>
+                <span class="value text-accent">{{ gameTimeDisplay }}</span>
+            </div>
+            <div class="display-toggle glass-card">
+                <label>Affichage:</label>
+                <div class="toggle-btns">
+                    <button [class.active]="viewMode === 'chips'" (click)="viewMode = 'chips'">Chips</button>
+                    <button [class.active]="viewMode === 'bb'" (click)="viewMode = 'bb'">BB</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-area">
+        <div class="poker-table glass-card">
+            <div class="pot-area">
+                <div class="pot-display" [class.dimmed]="state.isHandOver">
+                    <span class="pot-label text-gradient">{{ state.isHandOver ? 'DERNIER POT' : 'POT' }}</span>
+                    <span class="pot-value" [innerHTML]="formatValue(state.pot, state.bigBlind)"></span>
+                </div>
+
+                <div *ngIf="state.isHandOver && role === 'dealer'" class="hand-over-overlay">
+                    <h2 class="text-gradient">Main Terminée</h2>
+                    <div class="hand-over-btns">
+                        <button (click)="startNextHand()" class="btn-next big-btn"
+                            [disabled]="hasBankruptPlayers(state)">
+                            Main Suivante
+                        </button>
+                        <button (click)="startSavingReplay(state)" class="btn-secondary" style="margin-top: 10px;">
+                            Enregistrer la main 📁
+                        </button>
+                    </div>
+                    <p *ngIf="hasBankruptPlayers(state)" class="rebuy-hint">Veuillez gérer les joueurs sans jetons avant
+                        de continuer.</p>
+                </div>
+
+                <div class="community-cards" *ngIf="!state.isHandOver && state.currentPhase !== 'pre-flop'">
+                    <div class="cards-track">
+                        <div class="poker-card flop" *ngFor="let i of [0,1,2]" [style.animation-delay]="i * 0.1 + 's'">
+                            <div class="card-inner glass-card">🂠</div>
+                        </div>
+                        <div class="poker-card turn" *ngIf="['turn', 'river', 'showdown'].includes(state.currentPhase)"
+                            [style.animation-delay]="'0s'">
+                            <div class="card-inner glass-card">🂠</div>
+                        </div>
+                        <div class="poker-card river" *ngIf="['river', 'showdown'].includes(state.currentPhase)"
+                            [style.animation-delay]="'0s'">
+                            <div class="card-inner glass-card">🂠</div>
+                        </div>
+                    </div>
+                    <div class="phase-label text-gradient">{{ state.currentPhase.toUpperCase() }}</div>
+                </div>
+            </div>
+
+            <div *ngFor="let p of state.players; let i = index" class="player-seat"
+                [style.transform]="getSeatTransform(i, state.players.length)"
+                [class.active-turn]="!state.isHandOver && state.currentPlayerIndex === i" [class.folded]="p.isFolded"
+                [class.eliminated]="p.isEliminated" [class.is-winner]="isWinner(p.id)">
+
+                <div class="player-info glass-card">
+                    <span class="player-name">{{ p.name }}</span>
+                    <span class="player-chips" [class.danger-text]="p.chips === 0 && !p.isEliminated"
+                        [innerHTML]="formatValue(p.chips, state.bigBlind)">
+                    </span>
+
+                    <div class="badges">
+                        <span *ngIf="p.isDealer" class="badge dealer">D</span>
+                        <span *ngIf="p.isSmallBlind" class="badge sb">SB</span>
+                        <span *ngIf="p.isBigBlind" class="badge bb">BB</span>
+                    </div>
+
+                    <div *ngIf="p.currentBet > 0 && !state.isHandOver" class="current-bet"
+                        [innerHTML]="formatValue(p.currentBet, state.bigBlind)">
+                    </div>
+
+                    <div *ngIf="p.lastAction" class="action-bubble" [class]="p.lastAction.toLowerCase()">
+                        {{ p.lastAction }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls-area glass-card" *ngIf="!state.isHandOver && role === 'dealer'">
+        <div class="player-label">
+            <ng-container *ngIf="state.currentPhase !== 'showdown'; else showdownLabel">
+                Tour de : <span class="text-gradient">{{ getCurrentPlayer(state)?.name }}</span>
+            </ng-container>
+            <ng-template #showdownLabel>
+                <span class="text-gradient">Abattage</span>
+            </ng-template>
+        </div>
+
+        <div class="action-buttons">
+            <button (click)="fold()" class="btn-fold"
+                [disabled]="state.currentPhase === 'showdown' || state.waitingForPhaseAdvancement">Fold</button>
+            <button (click)="check()" class="btn-check"
+                [disabled]="state.currentPhase === 'showdown' || state.waitingForPhaseAdvancement">Check / Call</button>
+            <div class="raise-container"
+                [class.disabled]="state.currentPhase === 'showdown' || state.waitingForPhaseAdvancement">
+                <div class="stepper-group hide-mobile">
+                    <button (click)="adjustRaise(-state.bigBlind, state.minRaise)" class="btn-step"
+                        [disabled]="state.currentPhase === 'showdown' || state.waitingForPhaseAdvancement">−</button>
+
+                    <div class="raise-mount-display">
+                        <input type="number" [(ngModel)]="raiseAmount" [min]="state.minRaise"
+                            [disabled]="state.currentPhase === 'showdown' || state.waitingForPhaseAdvancement">
+                    </div>
+
+                    <button (click)="adjustRaise(state.bigBlind, state.minRaise)" class="btn-step"
+                        [disabled]="state.currentPhase === 'showdown' || state.waitingForPhaseAdvancement">+</button>
+                </div>
+
+                <div class="slider-group hide-desktop">
+                    <div class="slider-value" [innerHTML]="formatValue(raiseAmount, state.bigBlind)"></div>
+                    <input type="range" [(ngModel)]="raiseAmount" [min]="state.minRaise"
+                        [max]="(getCurrentPlayer(state)?.chips || state.minRaise)" [step]="state.bigBlind"
+                        [disabled]="state.currentPhase === 'showdown' || state.waitingForPhaseAdvancement">
+                </div>
+                <button (click)="raise()" class="btn-raise-action"
+                    [disabled]="state.currentPhase === 'showdown' || state.waitingForPhaseAdvancement">
+                    RELANCER
+                </button>
+            </div>
+            <button (click)="allIn()" class="btn-allin"
+                [disabled]="state.currentPhase === 'showdown' || state.waitingForPhaseAdvancement">All-In</button>
+        </div>
+
+        <div class="round-management">
+            <div *ngIf="state.currentPhase === 'showdown'" class="winner-selection">
+                <span class="text-gradient">Qui a gagné le pot de <span
+                        [innerHTML]="formatValue(state.pot, state.bigBlind)"></span> ?</span>
+                <div class="winner-btns">
+                    <button *ngFor="let p of getShowdownPlayers(state)" (click)="toggleWinner(p.id)"
+                        [class.selected]="selectedWinners.includes(p.id)">
+                        {{ p.name }}
+                    </button>
+                </div>
+
+                <div *ngIf="lastWinners.length > 0 && state.pot > 0" class="previous-winners">
+                    <small>Gagnant(s) pot précédent : {{ getWinnerNames(state) }}</small>
+                </div>
+
+                <button (click)="resolveShowdown()" class="btn-success"
+                    [disabled]="selectedWinners.length === 0">Confirmer les gagnants</button>
+            </div>
+            <button (click)="advancePhaseWithAnimation()" class="btn-next hide-mobile"
+                [class.flashing]="state.waitingForPhaseAdvancement" [disabled]="!state.waitingForPhaseAdvancement"
+                *ngIf="state.currentPhase !== 'showdown'">
+                {{ state.waitingForPhaseAdvancement ? 'DISTRIBUER' : 'Distribuer les cartes' }}
+            </button>
+            <button (click)="openAddPlayerModal(state.players.length)" class="btn-secondary hide-mobile">Ajouter un
+                joueur</button>
+        </div>
+    </div>
+
+    <!-- Simple Add Player Modal -->
+    <div class="modal-overlay" *ngIf="showAddPlayerModal && role === 'dealer'">
+        <div class="glass-card modal">
+            <h3>Ajouter un joueur</h3>
+            <div class="input-field">
+                <small>Nom</small>
+                <input type="text" [(ngModel)]="newPlayerName" placeholder="Nom">
+            </div>
+            <div class="input-field">
+                <small>Jetons</small>
+                <input type="number" [(ngModel)]="newPlayerChips" placeholder="Jetons">
+            </div>
+            <div class="input-field">
+                <small>Placer après :</small>
+                <select [(ngModel)]="selectedPosition" *ngIf="game$ | async as state">
+                    <option [value]="0">Au début de la table</option>
+                    <option *ngFor="let p of state.players; let i = index" [value]="i + 1">
+                        Après {{ p.name }}
+                    </option>
+                </select>
+            </div>
+            <div class="modal-buttons">
+                <button (click)="addPlayerByModal()" class="btn-success">Ajouter</button>
+                <button (click)="showAddPlayerModal = false" class="btn-fold">Annuler</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Elimination / Rebuy Modal -->
+    <ng-container *ngIf="role === 'dealer'">
+        <div class="modal-overlay" *ngIf="state.isHandOver && getBankruptPlayer(state) as p">
+            <div class="glass-card modal rebuy-modal">
+                <h2 class="text-gradient">{{ p.name }} est kickout !</h2>
+                <p>Voulez-vous recaver ou kickout ce joueur ?</p>
+                <div class="modal-buttons vertical">
+                    <div class="rebuy-input-group">
+                        <input type="number" [(ngModel)]="rebuyAmount" placeholder="Montant">
+                        <button (click)="confirmRebuy(p.id)" class="btn-success">Recaver</button>
+                    </div>
+                    <button (click)="confirmElimination(p.id)" class="btn-fold">Kickout le joueur</button>
+                </div>
+            </div>
+        </div>
+    </ng-container>
+
+    <!-- Blinds Update Modal -->
+    <div class="modal-overlay" *ngIf="showBlindsModal && role === 'dealer'">
+        <div class="glass-card modal">
+            <h3>Augmenter les Blinds</h3>
+            <div class="rebuy-input-group" style="flex-direction: column; gap: 15px;">
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <small style="color: var(--text-secondary)">Petite Blind</small>
+                    <input type="number" [(ngModel)]="newSmallBlind">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <small style="color: var(--text-secondary)">Grosse Blind</small>
+                    <input type="number" [(ngModel)]="newBigBlind">
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button (click)="confirmBlinds()" class="btn-success">Confirmer</button>
+                <button (click)="showBlindsModal = false" class="btn-fold">Annuler</button>
+            </div>
+        </div>
+    </div>
+    <!-- Replay Saver Modal -->
+    <div class="modal-overlay" *ngIf="isSavingReplay && role === 'dealer'">
+        <div class="glass-card modal card-saver-modal">
+            <h2 class="text-gradient">Enregistrer le coup</h2>
+
+            <div class="saver-section">
+                <small>BOARD (Flop / Turn / River)</small>
+                <div class="cards-setup-row">
+                    <div *ngFor="let i of [0,1,2,3,4]" class="card-slot" (click)="openPicker('board', i)">
+                        <div *ngIf="editingReplayBoard[i]" class="poker-card-real"
+                            [ngClass]="'suit-' + editingReplayBoard[i].suit">
+                            <span class="rank">{{ editingReplayBoard[i].rank }}</span>
+                            <span class="suit-icon">{{ getSuitChar(editingReplayBoard[i].suit) }}</span>
+                        </div>
+                        <div *ngIf="!editingReplayBoard[i]" class="card-placeholder">+</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="saver-players">
+                <div *ngFor="let p of editingReplayPlayers" class="player-card-setup">
+                    <div class="p-setup-header">
+                        <span class="p-setup-name" [class.is-winner]="p.isWinner">{{ p.name }}</span>
+                        <div class="p-status-badges">
+                            <span class="status-badge allin" *ngIf="p.isAllIn">ALL-IN</span>
+                            <span class="status-badge eliminated" *ngIf="p.isEliminated">KICKOUT</span>
+                            <span class="status-badge rebought" *ngIf="p.isRebought">RECAVE</span>
+                        </div>
+                    </div>
+                    <div class="cards-setup-row" *ngIf="!p.isFolded">
+                        <div *ngFor="let i of [0,1]" class="card-slot" (click)="openPicker('player', i, p.id)">
+                            <div *ngIf="p.holeCards[i]" class="poker-card-real mini"
+                                [ngClass]="'suit-' + p.holeCards[i].suit">
+                                <span class="rank">{{ p.holeCards[i].rank }}</span>
+                                <span class="suit-icon">{{ getSuitChar(p.holeCards[i].suit) }}</span>
+                            </div>
+                            <div *ngIf="!p.holeCards[i]" class="card-placeholder mini">+</div>
+                        </div>
+                    </div>
+                    <div *ngIf="p.isFolded" class="folded-placeholder">
+                        <span class="status-badge-mini folded">COUCHÉ</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-buttons">
+                <button (click)="confirmSaveReplay(state)" class="btn-success">Sauvegarder l'Action</button>
+                <button (click)="isSavingReplay = false" class="btn-fold">Annuler</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card Picker Sub-Modal -->
+    <div class="modal-overlay sub-modal" *ngIf="showCardPicker">
+        <div class="glass-card modal picker-modal">
+            <div class="picker-header">
+                <h3 class="text-gradient">Selectionnez une Carte</h3>
+                <p class="picker-subtitle">
+                    Pour : <strong class="text-accent">{{ getPickerTargetName() }}</strong>
+                </p>
+            </div>
+
+            <div class="picker-body">
+                <div *ngFor="let s of suits" class="picker-suit-row">
+                    <div class="suit-row-label" [ngClass]="'suit-' + s">{{ getSuitChar(s) }}</div>
+                    <div class="cards-suit-list">
+                        <div *ngFor="let r of ranks" class="selectable-card" [ngClass]="'suit-' + s"
+                            [class.selected]="isCardSelected(r, s)" (click)="selectCard(r, s)">
+                            <span class="rank">{{ r }}</span>
+                            <span class="suit-mini">{{ getSuitChar(s) }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-buttons">
+                <button (click)="showCardPicker = false" class="btn-fold">Fermer sans choisir</button>
+            </div>
+        </div>
+    </div>
+</div>
