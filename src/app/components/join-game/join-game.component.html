@@ -1,0 +1,80 @@
+<div class="join-container">
+    <div class="glass-card list-card">
+        <h1 class="text-gradient">Rejoindre une partie</h1>
+        <p class="subtitle" *ngIf="!selectedGameId">Sélectionnez une table active pour rejoindre</p>
+        <p class="subtitle" *ngIf="selectedGameId">Choisissez votre rôle pour la partie <strong>{{ selectedGameId
+                }}</strong></p>
+
+        <!-- Refresh Button for list view -->
+        <button *ngIf="!loading && !selectedGameId && games.length > 0" class="refresh-btn fab" (click)="refresh()"
+            [disabled]="loading">
+            🔄
+        </button>
+
+        <div *ngIf="loading" class="loading-state">
+            <div class="spinner"></div>
+            <p>Recherche des tables...</p>
+        </div>
+
+        <!-- No Games Found -->
+        <div *ngIf="!loading && !selectedGameId && games.length === 0" class="empty-state">
+            <div class="empty-icon">🎴</div>
+            <p>Aucune partie en cours trouvée.</p>
+            <button class="refresh-btn" (click)="refresh()">
+                <span>🔄</span> Actualiser
+            </button>
+        </div>
+
+        <!-- Game List -->
+        <div *ngIf="!loading && !selectedGameId && games.length > 0" class="game-list">
+            <div *ngFor="let game of games" class="game-item glass-card" (click)="selectGame(game.id)">
+                <div class="game-info">
+                    <div class="game-header">
+                        <span class="room-id">{{ game.id }}</span>
+                        <span class="status-badge" [class.in-progress]="game.state.players.length > 0">
+                            {{ game.state.currentPhase | uppercase }}
+                        </span>
+                    </div>
+                    <div class="game-details">
+                        <div class="detail">
+                            <span class="icon">👥</span>
+                            <span class="value">{{ game.state.players.length }} Joueurs</span>
+                        </div>
+                        <div class="detail">
+                            <span class="icon">💰</span>
+                            <span class="value">{{ game.state.smallBlind }}/{{ game.state.bigBlind }}</span>
+                        </div>
+                        <div class="detail">
+                            <span class="icon">🏦</span>
+                            <span class="value">{{ game.state.pot }} pot</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="join-arrow">➜</div>
+            </div>
+        </div>
+
+        <!-- Role Selection -->
+        <div *ngIf="!loading && selectedGameId" class="role-selection">
+            <div class="role-options">
+                <div class="role-card glass-card" (click)="join('dealer')">
+                    <div class="role-icon">🃏</div>
+                    <h3>Mode Dealer</h3>
+                    <p>Vous distribuez les cartes, gérez les mises et faites avancer la partie.</p>
+                    <div class="select-hint">CHEF DE TABLE</div>
+                </div>
+
+                <div class="role-card glass-card" (click)="join('spectator')">
+                    <div class="role-icon">👁️</div>
+                    <h3>Mode Spectateur</h3>
+                    <p>Vous observez la partie sans pouvoir agir. Idéal pour suivre le jeu en direct.</p>
+                    <div class="select-hint">OBSERVATEUR</div>
+                </div>
+            </div>
+
+            <button class="back-btn" (click)="selectedGameId = null">
+                ← Retour à la liste
+            </button>
+        </div>
+    </div>
+</div>
