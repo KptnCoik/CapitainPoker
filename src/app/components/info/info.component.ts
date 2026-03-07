@@ -94,8 +94,9 @@ import { Router } from '@angular/router';
                 [attr.data-ko]="p.stats.eliminations"
                 [attr.data-won]="p.stats.handsWon">
               <td class="rank-cell">
-                 <span *ngIf="!p.isEliminated" class="rank-num">{{ i + 1 }}</span>
-                 <span *ngIf="p.isEliminated" class="rank-out">OUT</span>
+                 <span class="rank-num" [class.is-out]="p.isEliminated">
+                   {{ p.finishPosition || (i + 1) }}
+                 </span>
               </td>
               <td class="name-cell">
                 <div class="player-name-group">
@@ -245,6 +246,11 @@ import { Router } from '@angular/router';
       font-weight: 900;
       font-size: 0.8rem;
     }
+    .rank-num.is-out {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--danger);
+      border: 1px solid var(--danger);
+    }
     .rank-out { font-size: 0.7rem; font-weight: 800; color: var(--danger); }
     .ko-badge {
       background: rgba(56, 189, 248, 0.2);
@@ -378,8 +384,15 @@ export class InfoComponent {
 
   getSortedPlayers(players: Player[]): Player[] {
     return [...players].sort((a, b) => {
-      if (a.isEliminated && !b.isEliminated) return 1;
-      if (!a.isEliminated && b.isEliminated) return -1;
+      // If both are eliminated, sort by finishPosition (1 is winner, 8 is first out)
+      if (a.finishPosition && b.finishPosition) {
+        return a.finishPosition - b.finishPosition;
+      }
+      // If one is eliminated, active players always come first
+      if (a.finishPosition) return 1;
+      if (b.finishPosition) return -1;
+
+      // If both are active, sort by chip count
       return b.chips - a.chips;
     });
   }
