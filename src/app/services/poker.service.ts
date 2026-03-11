@@ -31,8 +31,17 @@ export class PokerService {
     private activeGameId: string | null = null;
     private userRole: 'dealer' | 'spectator' = 'dealer';
     private firestoreUnsubscribe: (() => void) | null = null;
+    private stateHistory: string[] = [];
+    private readonly MAX_HISTORY = 40;
 
-    private updateState(newState: GameState) {
+    private updateState(newState: GameState, saveToHistory: boolean = true) {
+        if (saveToHistory) {
+            this.stateHistory.push(JSON.stringify(this.gameSubject.value));
+            if (this.stateHistory.length > this.MAX_HISTORY) {
+                this.stateHistory.shift();
+            }
+        }
+
         this.gameSubject.next(newState);
         if (this.activeGameId && isPlatformBrowser(this.platformId)) {
             const gameRef = doc(this.firestore, `games/${this.activeGameId}`);
@@ -42,10 +51,27 @@ export class PokerService {
         }
     }
 
+    public undo() {
+        if (this.stateHistory.length > 0) {
+            const lastStateJson = this.stateHistory.pop();
+            if (lastStateJson) {
+                const lastState = JSON.parse(lastStateJson);
+                // We call updateState WITH saveToHistory = false to avoid infinite loops
+                this.updateState(lastState, false);
+            }
+        }
+    }
+
+    public get canUndo(): boolean {
+        return this.stateHistory.length > 0;
+    }
+
     public async enableSync(gameId: string, forcePushInitialState = false) {
         if (this.firestoreUnsubscribe) {
             this.firestoreUnsubscribe();
         }
+
+        this.stateHistory = [];
 
         // Clear local state ONLY if we are joining an existing room (not hosting/creating)
         // to avoid seeing data from a previous session while waiting for the snapshot.
@@ -132,7 +158,8 @@ export class PokerService {
     }
 
     public setupGame(playerNames: string[], initialChips: number, smallBlind: number, bigBlind: number, dealerIndex: number) {
-        this.disableSync(); // Ensure no previous game ID is active before setting up
+        this.disableSync();
+        this.stateHistory = [];
         const players: Player[] = playerNames.map((name, index) => ({
             id: Math.random().toString(36).substring(2, 9),
             name,
@@ -305,18 +332,27 @@ export class PokerService {
                 const maxBetBefore = Math.max(...state.players.map(p => p.currentBet));
                 const bigBlind = state.bigBlind;
 
-                // If the max bet before this action was just the Big Blind (or less), this is an OPEN
-                if (maxBetBefore <= bigBlind) {
-                    updatedStats.handsOpened++;
-                } else {
-                    // If someone already raised above the Big Blind, this is a 3Bet (or higher)
+                // Check if this is the player's first raise in the hand to determine the hand category
+                const alreadyRaisedPF = state.history.some(h =>
+                    h.playerId === playerId &&
+                    h.phase === 'pre-flop' &&
+                    h.action === 'raise'
+                );
+
+                if (!alreadyRaisedPF) {
+                    if (maxBetBefore <= bigBlind) {
+                        // First raise is an Open Raise -> PFR
+                        updatedStats.pfrHands++;
+                        updatedStats.handsOpened++;
+                    } else {
+                        // First raise is a 3-Bet or higher -> 3-BET
+                        updatedStats.threeBetHands++;
+                        updatedStats.threeBets++;
+                    }
+                } else if (maxBetBefore > bigBlind) {
+                    // Subsequent raise (like a 4-bet after opening) - still a three-bet action but doesn't change hand category
                     updatedStats.threeBets++;
                 }
-
-                // If they haven't put money in yet (currentBet is 0 or blinds), count as VPIP
-                // For simplicity, we check if they just called/raised and it's their first action pre-flop
-                // Actually, VPIP is just "did they voluntarily contribute?". 
-                // We'll increment if this record doesn't show they already did.
             }
         } else if (isActuallyAllIn) {
             updatedStats.allIns++;
@@ -554,7 +590,9 @@ export class PokerService {
             handsOpened: 0,
             threeBets: 0,
             voluntarilyPlayed: 0,
-            eliminations: 0
+            eliminations: 0,
+            pfrHands: 0,
+            threeBetHands: 0
         };
     }
 
@@ -692,6 +730,7 @@ export class PokerService {
     }
 
     public resetGame() {
+        this.stateHistory = [];
         this.updateState(this.initialState);
     }
 }

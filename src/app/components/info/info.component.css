@@ -282,8 +282,10 @@
     }
 
     .ranking-table tr {
-        margin-bottom: 12px;
-        padding: 12px;
+        margin-bottom: 8px;
+        /* Reduced from 12px */
+        padding: 8px 12px;
+        /* Reduced vertical padding from 12px */
         background: rgba(255, 255, 255, 0.03);
         border-radius: 12px;
         position: relative;
@@ -292,27 +294,33 @@
 
     .ranking-table td {
         border: none;
-        padding: 4px 0;
+        padding: 2px 0;
+        /* Reduced from 4px */
     }
 
     .rank-cell {
         position: absolute;
-        top: 12px;
+        top: 8px;
+        /* Reduced from 12px */
         right: 12px;
         width: auto !important;
     }
 
     .name-cell {
-        font-size: 1.1rem;
-        padding-bottom: 8px !important;
+        font-size: 1rem;
+        /* Reduced from 1.1rem */
+        padding-bottom: 4px !important;
+        /* Reduced from 8px */
         border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
-        margin-bottom: 8px;
+        margin-bottom: 4px;
+        /* Reduced from 8px */
         width: calc(100% - 40px);
     }
 
     .chips-cell {
         text-align: left !important;
-        font-size: 1rem;
+        font-size: 0.9rem;
+        /* Reduced from 1rem */
         font-weight: 800;
         color: var(--accent-primary);
     }
@@ -321,9 +329,11 @@
     .ranking-table tr::after {
         content: 'Stats: KO ' attr(data-ko) ' / Gagnées ' attr(data-won);
         display: block;
-        font-size: 0.75rem;
+        font-size: 0.7rem;
+        /* Reduced from 0.75rem */
         color: var(--text-secondary);
-        margin-top: 8px;
+        margin-top: 4px;
+        /* Reduced from 8px */
     }
 
     .stats-grid {

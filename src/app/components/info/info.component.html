@@ -41,8 +41,9 @@
                 </div>
 
                 <div class="stat-row">
-                    <span class="label">Raises/All-ins</span>
-                    <span class="value">{{ p.stats.raises }} / {{ p.stats.allIns }}</span>
+                    <span class="label">PFR / 3-BET</span>
+                    <span class="value">{{ calculatePercentage(p.stats.pfrHands, p.stats.totalHands) }}% / {{
+                        calculatePercentage(p.stats.threeBetHands, p.stats.totalHands) }}%</span>
                 </div>
 
                 <div class="stat-row">

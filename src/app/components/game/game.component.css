@@ -104,10 +104,13 @@
     .left-badges,
     .right-badges {
         flex-direction: row;
+        flex-wrap: wrap;
+        /* Prevent overlap if too many items */
         gap: 3px;
         width: 100%;
         display: flex;
-        justify-content: space-between;
+        justify-content: flex-start;
+        /* Better for wrapped items */
     }
 
     .right-badges {
@@ -117,15 +120,17 @@
 
     .badge-item,
     .time-info {
-        flex: 1;
-        font-size: 0.5rem !important;
-        padding: 4px 2px !important;
+        flex: 0 1 auto;
+        /* Allow content-based width */
+        font-size: 0.55rem !important;
+        padding: 4px 5px !important;
         border-radius: 5px !important;
         display: flex;
         align-items: center;
         justify-content: center;
         min-width: 0;
         text-align: center;
+        gap: 3px !important;
     }
 
     .time-info .value {
@@ -150,7 +155,7 @@
         padding: 1px 4px;
         font-size: 0.55rem;
         border-radius: 3px;
-        margin-left: 2px;
+        margin-left: 0;
     }
 }
 
@@ -167,6 +172,47 @@
     background: var(--accent-primary);
     color: #000;
     border-color: transparent;
+}
+
+.btn-undo {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--card-border);
+    color: var(--text-primary);
+    transition: var(--transition);
+}
+
+.btn-undo:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 15px rgba(56, 189, 248, 0.2);
+    transform: translateY(-2px);
+}
+
+.btn-undo:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.btn-undo:disabled {
+    opacity: 0.2;
+    cursor: not-allowed;
+    filter: grayscale(1);
+    box-shadow: none;
+}
+
+.undo-icon {
+    font-size: 1.1rem;
+    margin-right: 4px;
+}
+
+@media (max-width: 768px) {
+    .btn-undo {
+        flex: 0.6 !important;
+    }
+
+    .undo-icon {
+        margin-right: 0;
+        font-size: 0.8rem;
+    }
 }
 
 .toggle-btns {
@@ -939,8 +985,35 @@
         align-items: center;
     }
 
+    .slider-input-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        min-width: 80px;
+    }
+
+    .mobile-raise-input {
+        width: 60px !important;
+        height: 30px !important;
+        padding: 2px 4px !important;
+        font-size: 0.85rem !important;
+        background: rgba(255, 255, 255, 0.1) !important;
+        border: 1px solid var(--accent-primary) !important;
+        border-radius: 4px !important;
+        color: var(--accent-primary) !important;
+        text-align: center;
+        font-weight: 800;
+    }
+
+    .bb-hint {
+        font-size: 0.6rem;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+    }
+
     .slider-group input[type=range] {
         -webkit-appearance: none;
+        appearance: none;
         flex: 1;
         /* Take remaining space */
         background: transparent;

@@ -3,19 +3,20 @@
     <div class="top-bar">
         <div class="left-badges">
             <div class="blind-info glass-card badge-item">
-                Blinds: <span class="text-gradient">{{ state.smallBlind }} / {{ state.bigBlind }}</span>
+                Blinds: <span class="text-gradient">{{ state.smallBlind }}/{{ state.bigBlind }}</span>
                 <button *ngIf="role === 'dealer'" (click)="openBlindsModal(state.smallBlind, state.bigBlind)"
                     class="edit-blinds-btn" title="Augmenter les Blinds">✎</button>
             </div>
             <div class="room-info glass-card badge-item" *ngIf="roomId">
                 Salle: <span class="text-accent">{{ roomId }}</span>
             </div>
-            <!-- Mobile only buttons at top -->
-            <button *ngIf="role === 'dealer' && state.currentPhase !== 'showdown'" (click)="advancePhaseWithAnimation()"
-                class="header-btn btn-next badge-item hide-desktop" [class.flashing]="state.waitingForPhaseAdvancement"
-                [disabled]="!state.waitingForPhaseAdvancement">
-                DIST.
+            <button *ngIf="role === 'dealer'" (click)="undo()" class="header-btn btn-undo badge-item"
+                [disabled]="!canUndo" title="Annuler la dernière action">
+                <span class="undo-icon">↩️</span>
+                <span class="hide-mobile">Annuler</span>
             </button>
+            <!-- Mobile only buttons at top -->
+            <!-- Mobile only buttons at top (Next hand removed, moved to bottom) -->
             <button *ngIf="role === 'dealer'" (click)="openAddPlayerModal(state.players.length)"
                 class="header-btn btn-secondary badge-item hide-desktop">
                 +JOUEUR
@@ -119,11 +120,18 @@
         </div>
 
         <div class="action-buttons">
-            <button (click)="fold()" class="btn-fold"
+            <!-- Mobile only Distribute button -->
+            <button *ngIf="role === 'dealer' && state.currentPhase !== 'showdown' && state.waitingForPhaseAdvancement"
+                (click)="advancePhaseWithAnimation()" class="btn-next hide-desktop flashing"
+                style="width: 100%; padding: 12px !important; margin-bottom: 10px; font-size: 1.1rem !important; border-radius: 12px !important; color: #000 !important; font-weight: 900 !important;">
+                DISTRIBUER
+            </button>
+
+            <button (click)="fold()" class="btn-fold" [class.hide-mobile]="state.waitingForPhaseAdvancement"
                 [disabled]="state.currentPhase === 'showdown' || state.waitingForPhaseAdvancement">Fold</button>
-            <button (click)="check()" class="btn-check"
+            <button (click)="check()" class="btn-check" [class.hide-mobile]="state.waitingForPhaseAdvancement"
                 [disabled]="state.currentPhase === 'showdown' || state.waitingForPhaseAdvancement">Check / Call</button>
-            <div class="raise-container"
+            <div class="raise-container" [class.hide-mobile]="state.waitingForPhaseAdvancement"
                 [class.disabled]="state.currentPhase === 'showdown' || state.waitingForPhaseAdvancement">
                 <div class="stepper-group hide-mobile">
                     <button (click)="adjustRaise(-state.bigBlind, state.minRaise)" class="btn-step"
@@ -139,17 +147,27 @@
                 </div>
 
                 <div class="slider-group hide-desktop">
-                    <div class="slider-value" [innerHTML]="formatValue(raiseAmount, state.bigBlind)"></div>
+                    <div class="slider-value" [innerHTML]="formatValue(raiseAmount, state.bigBlind)"
+                        *ngIf="!isEditingRaiseAmount" (click)="isEditingRaiseAmount = true"></div>
+
+                    <div class="slider-input-wrapper" *ngIf="isEditingRaiseAmount">
+                        <input type="number" [(ngModel)]="raiseAmount" (blur)="isEditingRaiseAmount = false"
+                            (keyup.enter)="isEditingRaiseAmount = false" class="mobile-raise-input" autofocus
+                            placeholder="Jetons" inputmode="numeric" pattern="[0-9]*">
+                        <span class="bb-hint" *ngIf="viewMode === 'bb'">chips</span>
+                    </div>
+
                     <input type="range" [(ngModel)]="raiseAmount" [min]="state.minRaise"
                         [max]="(getCurrentPlayer(state)?.chips || state.minRaise)" [step]="state.bigBlind"
                         [disabled]="state.currentPhase === 'showdown' || state.waitingForPhaseAdvancement">
                 </div>
                 <button (click)="raise()" class="btn-raise-action"
+                    [class.hide-mobile]="state.waitingForPhaseAdvancement"
                     [disabled]="state.currentPhase === 'showdown' || state.waitingForPhaseAdvancement">
                     RELANCER
                 </button>
             </div>
-            <button (click)="allIn()" class="btn-allin"
+            <button (click)="allIn()" class="btn-allin" [class.hide-mobile]="state.waitingForPhaseAdvancement"
                 [disabled]="state.currentPhase === 'showdown' || state.waitingForPhaseAdvancement">All-In</button>
         </div>
 

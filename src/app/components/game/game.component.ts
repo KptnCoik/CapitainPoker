@@ -24,6 +24,7 @@ export class GameComponent implements OnInit, OnDestroy {
   viewMode: 'chips' | 'bb' = 'chips';
   selectedPosition: number = 0;
   accumulatedPotForHistory = 0;
+  isEditingRaiseAmount = false;
 
   // Blinds update
   showBlindsModal = false;
@@ -382,5 +383,13 @@ export class GameComponent implements OnInit, OnDestroy {
       this.pokerService.setBlinds(this.newSmallBlind, this.newBigBlind);
       this.showBlindsModal = false;
     }
+  }
+
+  undo() {
+    this.pokerService.undo();
+  }
+
+  get canUndo(): boolean {
+    return this.pokerService.canUndo;
   }
 }

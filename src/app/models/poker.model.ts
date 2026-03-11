@@ -34,6 +34,8 @@ export interface PlayerStats {
     threeBets: number;        // Raised over a previous raise
     voluntarilyPlayed: number; // VPIP (Voluntarily Put In Pot - preflop call or raise)
     eliminations: number;      // Number of players eliminated by this player
+    pfrHands: number;          // Number of hands with at least one pre-flop raise
+    threeBetHands: number;     // Number of hands with at least one pre-flop 3-bet+
 }
 
 export type PokerPhase = 'pre-flop' | 'flop' | 'turn' | 'river' | 'showdown';
